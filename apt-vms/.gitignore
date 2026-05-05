@@ -1,0 +1,15 @@
+# Dependency directories (The most important part)
+node_modules/
+**/node_modules/
+
+# Secrets
+.env
+**/ .env
+
+# Build outputs
+dist/
+build/
+
+# System files
+.DS_Store
+Thumbs.db
