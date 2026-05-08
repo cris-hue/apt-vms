@@ -57,7 +57,7 @@ const LandingPage = () => {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-slate-800 bg-slate-900/70 p-8 shadow-2xl shadow-slate-950/40">
+          <div className="rounded-4xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl shadow-slate-950/40">
             <div className="space-y-6">
               <div className="rounded-3xl bg-slate-950/80 p-6 ring-1 ring-slate-800">
                 <p className="text-sm uppercase tracking-[0.24em] text-blue-400">Visitor Portal</p>
