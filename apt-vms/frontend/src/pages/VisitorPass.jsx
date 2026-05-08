@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { QRCodeCanvas } from 'qrcode.react'; 
-import axios from 'axios';
+import API from '../api/axios';
 import { ShieldCheck, MapPin, Calendar, Clock } from 'lucide-react';
 
 const VisitorPass = () => {
@@ -14,7 +14,7 @@ const VisitorPass = () => {
       try {
         // UPDATED: Calling the new public endpoint
         // This bypasses the 'protect' middleware so the guest can see their pass
-        const { data } = await axios.get(`http://localhost:5000/api/visitors/public/pass/${token}`);
+        const { data } = await API.get(`/visitors/public/pass/${token}`);
         setVisitor(data.data);
       } catch (err) {
         console.error("Pass verification failed. It may not exist in the database.");
