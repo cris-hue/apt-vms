@@ -11,7 +11,8 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    const token = localStorage.getItem('token');
+    if (storedUser && token) {
       setUser(JSON.parse(storedUser));
     }
     setLoading(false);
@@ -20,23 +21,17 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const { data } = await API.post('/auth/login', { email, password });
-      
-      // Store the JWT token and the user object
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);
       
-      // Navigate based on role
       if (data.user.role === 'admin') navigate('/admin');
       else if (data.user.role === 'tenant') navigate('/tenant-dashboard');
       else if (data.user.role === 'guard') navigate('/guard-dashboard');
       
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        message: error.response?.data?.message || "Login failed" 
-      };
+      return { success: false, message: error.response?.data?.message || "Login failed" };
     }
   };
 
@@ -47,7 +42,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

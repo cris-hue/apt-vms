@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
+  // This bypasses the network entirely. Use this to log in on your laptop.
   baseURL: 'http://localhost:5000/api', 
 });
 

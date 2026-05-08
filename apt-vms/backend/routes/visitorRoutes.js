@@ -5,20 +5,28 @@ const {
   registerVisitor, 
   checkInVisitor, 
   checkOutVisitor, 
-  getVisitorByQR 
+  getVisitorByQR,
+  getAllVisitors,
+  getMyVisitors,
+  updateVisitor,
+  deleteVisitor
 } = require('../controllers/visitorController');
 
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 // --- PUBLIC ROUTES ---
-// This allows guests to view their pass without logging in
 router.get('/public/pass/:qrCode', getVisitorByQR);
 
 // --- TENANT ROUTES ---
 router.post('/register', protect, authorize('tenant'), registerVisitor);
+router.get('/my-visitors', protect, authorize('tenant'), getMyVisitors);
+
+// Routes for Managing Active Passes
+router.put('/:id', protect, authorize('tenant'), updateVisitor);
+router.delete('/:id', protect, authorize('tenant'), deleteVisitor);
 
 // --- GUARD ROUTES ---
-// We keep these protected so only a logged-in guard can scan for the purpose of entry/exit
+router.get('/all', protect, authorize('guard', 'admin'), getAllVisitors);
 router.get('/scan/:qrCode', protect, authorize('guard'), getVisitorByQR);
 router.put('/checkin/:id', protect, authorize('guard'), checkInVisitor);
 router.put('/checkout/:id', protect, authorize('guard'), checkOutVisitor);
