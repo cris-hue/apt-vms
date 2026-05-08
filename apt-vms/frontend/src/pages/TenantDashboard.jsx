@@ -1,10 +1,10 @@
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useState, useEffect, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import API from '../api/axios';
 import { 
   ShieldCheck, History, User, LogOut, LayoutDashboard, 
   Settings, Activity, Plus, Save, Mail, CheckCircle2, 
-  Clock, Trash2, Edit3, X, Eye, Phone, Share2
+  Clock, Trash2, Edit3, X, Eye, Phone, Share2, Menu, Download
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react'; 
 import InviteModal from '../components/InviteModal';
@@ -17,6 +17,8 @@ const TenantDashboard = () => {
   const [viewingPass, setViewingPass] = useState(null); 
   const [editingPass, setEditingPass] = useState(null);
   const [profileForm, setProfileForm] = useState({ phone: '' });
+  const qrCanvasRef = useRef(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -72,18 +74,30 @@ const TenantDashboard = () => {
     window.open(`https://wa.me/?text=${msg}`, '_blank');
   };
 
+  const downloadQrCode = () => {
+    const canvas = qrCanvasRef.current || document.getElementById('tenant-qr-canvas');
+    if (!canvas) return alert('QR code not ready yet.');
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = `${viewingPass?.name || 'visitor'}-securepass.png`;
+    link.click();
+  };
+
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC] font-sans text-slate-900">
-      <aside className="w-80 bg-slate-900 text-slate-300 flex flex-col sticky top-0 h-screen shadow-2xl">
-        <div className="p-8 flex items-center gap-3 text-white border-b border-slate-800/50">
-          <div className="bg-blue-600 p-2 rounded-lg shadow-lg"><ShieldCheck size={24} /></div>
-          <h1 className="text-xl font-black tracking-tighter uppercase italic">SecureNest <span className="text-blue-500 not-italic lowercase">tenant</span></h1>
+    <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans text-slate-900">
+      <aside className={`w-full md:w-80 bg-slate-900 text-slate-300 flex flex-col ${sidebarOpen ? 'fixed inset-0 z-100 md:sticky md:inset-auto md:z-0' : 'hidden md:flex'} md:top-0 md:h-screen shadow-2xl transition-all`}>
+        <div className="p-8 flex items-center justify-between gap-3 text-white border-b border-slate-800/50">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-lg shadow-lg"><ShieldCheck size={24} /></div>
+            <h1 className="text-xl font-black tracking-tighter uppercase italic">SecureNest <span className="text-blue-500 not-italic lowercase">tenant</span></h1>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden p-2 hover:bg-slate-800 rounded-lg"><X size={20} /></button>
         </div>
         <nav className="flex-1 px-4 space-y-1.5 mt-8">
-          <SidebarItem active={activeView === 'dashboard'} onClick={() => setActiveView('dashboard')} icon={<LayoutDashboard size={18}/>} label="Overview" />
-          <SidebarItem active={activeView === 'active'} onClick={() => setActiveView('active')} icon={<Clock size={18}/>} label="Active Passes" />
-          <SidebarItem active={activeView === 'history'} onClick={() => setActiveView('history')} icon={<History size={18}/>} label="Pass History" />
-          <SidebarItem active={activeView === 'profile'} onClick={() => setActiveView('profile')} icon={<Settings size={18}/>} label="My Profile" />
+          <SidebarItem active={activeView === 'dashboard'} onClick={() => { setActiveView('dashboard'); setSidebarOpen(false); }} icon={<LayoutDashboard size={18}/>} label="Overview" />
+          <SidebarItem active={activeView === 'active'} onClick={() => { setActiveView('active'); setSidebarOpen(false); }} icon={<Clock size={18}/>} label="Active Passes" />
+          <SidebarItem active={activeView === 'history'} onClick={() => { setActiveView('history'); setSidebarOpen(false); }} icon={<History size={18}/>} label="Pass History" />
+          <SidebarItem active={activeView === 'profile'} onClick={() => { setActiveView('profile'); setSidebarOpen(false); }} icon={<Settings size={18}/>} label="My Profile" />
         </nav>
         <div className="p-6 border-t border-slate-800 bg-slate-900/50">
           <div className="flex items-center gap-4 mb-6 px-2">
@@ -100,11 +114,14 @@ const TenantDashboard = () => {
         </div>
       </aside>
 
-      <main className="flex-1 p-12 overflow-y-auto">
-        <header className="flex justify-between items-center mb-10 text-left">
-          <div>
-            <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">{activeView.replace('dashboard', 'Overview').replace('active', 'Active Passes').replace('history', 'Pass History').replace('profile', 'My Profile')}</h2>
-            <p className="text-slate-400 font-black mt-1 uppercase text-[10px] tracking-widest italic leading-none text-left">Residential Access Management</p>
+      <main className="flex-1 p-6 md:p-12 overflow-y-auto">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 text-left gap-4">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 text-slate-900 rounded-lg hover:bg-slate-200 transition-colors"><Menu size={20} /></button>
+            <div>
+              <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">{activeView.replace('dashboard', 'Overview').replace('active', 'Active Passes').replace('history', 'Pass History').replace('profile', 'My Profile')}</h2>
+              <p className="text-slate-400 font-black mt-1 uppercase text-[10px] tracking-widest italic leading-none text-left">Residential Access Management</p>
+            </div>
           </div>
           <button onClick={() => setIsInviteOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-200"><Plus size={18} /> Invite Visitor</button>
         </header>
@@ -201,9 +218,12 @@ const TenantDashboard = () => {
             <button onClick={() => setViewingPass(null)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-900"><X size={24}/></button>
             <h3 className="text-2xl font-black uppercase tracking-tighter mb-1">{viewingPass.name}</h3>
             <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-8 italic">Secure Entry Pass</p>
-            <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 flex justify-center mb-8 shadow-inner"><QRCodeCanvas value={viewingPass.qrCode} size={180} level="H" includeMargin={true} /></div>
+            <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 flex justify-center mb-8 shadow-inner"><QRCodeCanvas ref={qrCanvasRef} id="tenant-qr-canvas" value={viewingPass.qrCode} size={180} level="H" includeMargin={true} /></div>
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10">Code: {viewingPass.qrCode}</div>
-            <button onClick={() => shareToWhatsApp(viewingPass)} className="w-full bg-green-500 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-green-600 transition-all shadow-xl shadow-green-100"><Share2 size={18} /> WhatsApp Pass</button>
+            <div className="grid gap-3">
+              <button onClick={downloadQrCode} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl shadow-slate-100"><Download size={18} /> Download QR</button>
+              <button onClick={() => shareToWhatsApp(viewingPass)} className="w-full bg-green-500 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-green-600 transition-all shadow-xl shadow-green-100"><Share2 size={18} /> WhatsApp Pass</button>
+            </div>
           </div>
         </div>
       )}

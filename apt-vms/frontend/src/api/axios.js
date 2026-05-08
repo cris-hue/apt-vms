@@ -1,8 +1,9 @@
 import axios from 'axios';
 
 const API = axios.create({
-  // This bypasses the network entirely. Use this to log in on your laptop.
-  baseURL: 'http://localhost:5000/api', 
+  // Use the Dev Tunnel URL for mobile testing
+  // Ensure port 5000 in VS Code is set to "Public" visibility
+  baseURL: 'https://ntdj1z16-5000.uks1.devtunnels.ms/api', 
 });
 
 API.interceptors.request.use((req) => {
