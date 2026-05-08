@@ -4,7 +4,7 @@ import API from '../api/axios';
 import { 
   ShieldCheck, Search, UserCheck, Clock, 
   LogOut, X, Info, History, Activity, QrCode, 
-  CheckCircle2, Camera, CameraOff, ShieldAlert
+  CheckCircle2, Camera, CameraOff, ShieldAlert, Menu
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode'; 
 
@@ -157,13 +157,22 @@ const GuardDashboard = () => {
       </aside>
 
       {/* --- MAIN CONTENT (Responsive) --- */}
-      <main className="flex-1 p-6 md:p-12 overflow-y-auto w-full">
-        <header className="flex justify-between items-center mb-8 md:mb-10 text-left">
-          <div>
-            <h2 className="text-2xl md:text-4xl font-extrabold text-slate-900 tracking-tight uppercase italic leading-none">Security Deck</h2>
-            <p className="text-slate-400 font-semibold mt-2 uppercase text-[10px] tracking-widest italic leading-none">Live Premise Activity</p>
+      <main className="flex-1 min-h-0 p-6 md:p-12 overflow-hidden w-full flex flex-col">
+        <header className="flex justify-between items-center mb-8 md:mb-10 text-left gap-4">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-3 text-slate-900 rounded-xl hover:bg-slate-100 transition-all">
+              <Menu size={24} />
+            </button>
+            <div>
+              <h2 className="text-2xl md:text-4xl font-extrabold text-slate-900 tracking-tight uppercase italic leading-none">Security Deck</h2>
+              <p className="text-slate-400 font-semibold mt-2 uppercase text-[10px] tracking-widest italic leading-none">Live Premise Activity</p>
+            </div>
           </div>
-          <button onClick={() => setSidebarOpen(true)} className="md:hidden p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"><ShieldCheck size={24} /></button>
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-bold uppercase shadow-lg">
+              {user?.name?.charAt(0) || 'G'}
+            </div>
+          </div>
         </header>
 
         {/* STATS (Responsive Grid) */}
@@ -174,12 +183,12 @@ const GuardDashboard = () => {
         </div>
 
         {/* REGISTRY LOGS */}
-        <div className="bg-white rounded-[2rem] md:rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden text-left">
+        <div className="flex-1 min-h-0 bg-white rounded-[4xl] md:rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden text-left flex flex-col">
           <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 italic">Registry Logs • {activeFilter}</h3>
              <button onClick={fetchVisitors} className="p-2 md:p-3 text-slate-400 hover:text-blue-600 transition-all bg-white rounded-xl shadow-sm"><Activity size={18}/></button>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 overflow-y-auto flex-1 min-h-0">
             {filteredList.map(v => (
               <div key={v._id} className="px-6 md:px-10 py-6 md:py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 group hover:bg-blue-50/20 transition-all">
                 <div className="flex items-center gap-4 md:gap-6 text-left">
@@ -208,7 +217,7 @@ const GuardDashboard = () => {
       {/* --- VERIFICATION MODAL HUB (Responsive) --- */}
       {showVerifyModal && (
         <div className="fixed inset-0 z-200 flex items-center justify-center p-4 md:p-6 bg-slate-900/90 backdrop-blur-xl animate-in fade-in duration-300">
-           <div className="bg-white w-full md:w-auto md:max-w-4xl rounded-[2rem] md:rounded-[4rem] shadow-2xl overflow-hidden relative flex flex-col md:flex-row text-left h-screen md:h-auto md:max-h-[90vh]">
+           <div className="bg-white w-full md:w-auto md:max-w-4xl rounded-4xl md:rounded-[4rem] shadow-2xl overflow-hidden relative flex flex-col md:flex-row text-left h-screen md:h-auto md:max-h-[90vh]">
                 <button 
                     onClick={() => { stopScanner(); setShowVerifyModal(false); setScannedVisitor(null); setVmsSearch(''); }}
                     className="absolute top-4 md:top-10 right-4 md:right-10 z-210 p-3 bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200 rounded-full transition-all"
@@ -251,7 +260,7 @@ const GuardDashboard = () => {
                         </div>
 
                         {isScanning && (
-                            <div className="flex-1 min-h-[300px] md:min-h-auto overflow-hidden rounded-[2rem] border-4 md:border-8 border-slate-50 bg-black shadow-2xl relative">
+                            <div className="flex-1 min-h-75 md:min-h-auto overflow-hidden rounded-4xl border-4 md:border-8 border-slate-50 bg-black shadow-2xl relative">
                                 <div id="reader" className="w-full h-full"></div>
                                 <div className="absolute inset-0 border-2 border-blue-400/20 pointer-events-none">
                                     <div className="absolute top-1/2 left-0 w-full h-0.5 bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)] animate-pulse"></div>
@@ -262,7 +271,7 @@ const GuardDashboard = () => {
                 </div>
 
                 {/* Right Column */}
-                <div className="w-full md:w-[400px] bg-slate-50 p-8 md:p-12 flex flex-col justify-center">
+                <div className="w-full md:w-100 bg-slate-50 p-8 md:p-12 flex flex-col justify-center">
                     {scannedVisitor ? (
                         <div className="animate-in fade-in slide-in-from-right-4 duration-500">
                             <div className="text-center mb-8 md:mb-10">
@@ -299,14 +308,14 @@ const GuardDashboard = () => {
       {/* DETAIL MODAL */}
       {selectedVisitor && (
         <div className="fixed inset-0 z-120 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-[2rem] md:rounded-[4rem] shadow-2xl p-8 md:p-12 text-left animate-in zoom-in-95 relative">
+          <div className="bg-white w-full max-w-md rounded-4xl md:rounded-[4rem] shadow-2xl p-8 md:p-12 text-left animate-in zoom-in-95 relative">
             <button onClick={() => setSelectedVisitor(null)} className="absolute top-6 md:top-10 right-6 md:right-10 text-slate-300 hover:text-slate-900"><X size={28}/></button>
             <div className="mb-8 md:mb-10 text-center">
                <div className="w-16 md:w-20 h-16 md:h-20 bg-blue-600 text-white rounded-3xl flex items-center justify-center text-2xl md:text-3xl font-bold mx-auto mb-4 md:mb-6 shadow-xl">{selectedVisitor.name?.charAt(0)}</div>
                <h3 className="text-2xl md:text-3xl font-extrabold text-slate-900 uppercase tracking-tight">{selectedVisitor.name}</h3>
                <span className="inline-block mt-2 text-[9px] bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-bold uppercase tracking-widest">{selectedVisitor.status} LOG</span>
             </div>
-            <div className="space-y-4 md:space-y-6 bg-slate-50 p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-slate-100">
+            <div className="space-y-4 md:space-y-6 bg-slate-50 p-6 md:p-8 rounded-4xl md:rounded-[3rem] border border-slate-100">
               <DetailField label="ID Number" value={selectedVisitor.idNumber} />
               <DetailField label="Apartment" value={`Unit ${selectedVisitor.tenantId?.unitNumber} (${selectedVisitor.tenantId?.name})`} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 md:pt-6 border-t border-slate-200">

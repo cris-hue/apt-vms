@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import API from '../api/axios';
-import { UserPlus, ShieldCheck, Lock, Mail, User, Phone, Home } from 'lucide-react';
+import { UserPlus, ShieldCheck, Lock, Mail, User, Phone, Home, Loader2 } from 'lucide-react';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -9,6 +9,8 @@ const Register = () => {
   });
   const [error, setError] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [takenUnits, setTakenUnits] = useState([]);
 
   const unitOptions = Array.from({ length: 100 }, (_, i) => `A${(i + 1).toString().padStart(3, '0')}`);
 
@@ -16,19 +18,39 @@ const Register = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  useEffect(() => {
+    const fetchTakenUnits = async () => {
+      try {
+        const { data } = await API.get('/auth/taken-units');
+        setTakenUnits(data.units || []);
+      } catch {
+        setTakenUnits([]);
+      }
+    };
+    fetchTakenUnits();
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (formData.password !== formData.confirmPassword) return setError("Passwords do not match");
+    if (formData.password !== formData.confirmPassword) {
+      return setError("Passwords do not match");
+    }
 
+    if (formData.role === 'tenant' && !formData.unitNumber) {
+      return setError('Please select an apartment unit.');
+    }
+
+    setIsLoading(true);
     try {
       const { confirmPassword, ...submitData } = formData;
-      // submitData now contains { name, email, phone, unitNumber, password, role }
       await API.post('/auth/register', submitData);
       setIsSubmitted(true);
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -83,9 +105,14 @@ const Register = () => {
           {formData.role === 'tenant' && (
             <div className="relative">
               <Home className="absolute left-3 top-3 text-slate-400" size={18} />
-              <select name="unitNumber" required className="w-full pl-10 pr-4 py-2 bg-slate-50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 appearance-none" onChange={handleChange}>
+              <select name="unitNumber" required className="w-full pl-10 pr-4 py-2 bg-slate-50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 appearance-none" onChange={handleChange} value={formData.unitNumber}>
                 <option value="">Select Unit (A001-A100)</option>
-                {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
+                {unitOptions.map(u => {
+                  const taken = takenUnits.includes(u);
+                  return (
+                    <option key={u} value={u} disabled={taken}>{u}{taken ? ' – taken' : ''}</option>
+                  );
+                })}
               </select>
             </div>
           )}
@@ -100,7 +127,9 @@ const Register = () => {
             <input name="confirmPassword" type="password" placeholder="Confirm Password" required className="w-full pl-10 pr-4 py-2 bg-slate-50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all" onChange={handleChange} />
           </div>
 
-          <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all active:scale-95">Register</button>
+          <button type="submit" disabled={isLoading} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 flex items-center justify-center gap-2">
+            {isLoading ? <><Loader2 className="animate-spin" size={18} /> Sending...</> : 'Register'}
+          </button>
         </form>
         <p className="mt-6 text-center text-sm text-slate-500">Already have an account? <Link to="/login" className="text-blue-600 font-semibold hover:underline">Sign In</Link></p>
       </div>

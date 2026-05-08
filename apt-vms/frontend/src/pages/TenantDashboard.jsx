@@ -1,6 +1,7 @@
 import { useContext, useState, useEffect, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import API from '../api/axios';
+import { io } from 'socket.io-client';
 import { 
   ShieldCheck, History, User, LogOut, LayoutDashboard, 
   Settings, Activity, Plus, Save, Mail, CheckCircle2, 
@@ -14,6 +15,7 @@ const TenantDashboard = () => {
   const [activeView, setActiveView] = useState('dashboard'); 
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [history, setHistory] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [viewingPass, setViewingPass] = useState(null); 
   const [editingPass, setEditingPass] = useState(null);
   const [profileForm, setProfileForm] = useState({ phone: '' });
@@ -25,6 +27,31 @@ const TenantDashboard = () => {
       setProfileForm({ phone: user.phone || '' });
       fetchHistory();
     }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const socketServer = API.defaults.baseURL.replace(/\/api\/?$/, '');
+    const socket = io(socketServer, { transports: ['websocket'] });
+
+    socket.on('connect', () => {
+      console.log('Tenant socket connected:', socket.id);
+      socket.emit('joinTenantRoom', user._id);
+    });
+
+    socket.on('visitor-status-updated', (payload) => {
+      setNotifications((prev) => [{ id: Date.now(), ...payload }, ...prev].slice(0, 3));
+      fetchHistory();
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('Tenant socket connect error:', err);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [user]);
 
   const fetchHistory = async () => {
@@ -70,8 +97,13 @@ const TenantDashboard = () => {
   };
 
   const shareToWhatsApp = (v) => {
-    const msg = `*SecureNest Entry Pass*%0AHello ${v.name}, your code for Unit ${user.unitNumber} is: *${v.qrCode}*`;
-    window.open(`https://wa.me/?text=${msg}`, '_blank');
+    const baseUrl = import.meta.env.VITE_PUBLIC_URL || window.location.origin;
+    const passUrl = `${baseUrl}/visitor/pass/${v.qrCode}`;
+    const msg = `*SecureNest Entry Pass*
+Hello ${v.name}, your entry code for Unit ${user.unitNumber} is: *${v.qrCode}*
+
+Use this link: ${passUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   const downloadQrCode = () => {
@@ -115,7 +147,7 @@ const TenantDashboard = () => {
       </aside>
 
       <main className="flex-1 p-6 md:p-12 overflow-y-auto">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 text-left gap-4">
+        <header className="relative flex flex-col md:flex-row justify-between items-start md:items-center mb-10 text-left gap-4 pr-16">
           <div className="flex items-center gap-4">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 text-slate-900 rounded-lg hover:bg-slate-200 transition-colors"><Menu size={20} /></button>
             <div>
@@ -123,8 +155,32 @@ const TenantDashboard = () => {
               <p className="text-slate-400 font-black mt-1 uppercase text-[10px] tracking-widest italic leading-none text-left">Residential Access Management</p>
             </div>
           </div>
-          <button onClick={() => setIsInviteOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-200"><Plus size={18} /> Invite Visitor</button>
+          <div className="absolute right-0 top-0 flex items-center gap-4">
+            <button onClick={() => setIsInviteOpen(true)} className="hidden sm:inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-200"><Plus size={18} /> Invite Visitor</button>
+            <div className="w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-black uppercase shadow-lg">{user?.name?.charAt(0) || 'T'}</div>
+          </div>
         </header>
+
+        {notifications.length > 0 && (
+          <div className="space-y-3 mb-6">
+            {notifications.map((notification) => (
+              <div key={notification.id} className="rounded-4xl border border-slate-200 bg-slate-950/95 text-white p-4 shadow-xl">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-400">Real-time alert</p>
+                    <p className="font-black text-sm uppercase tracking-tight text-white">{notification.visitor.name} has {notification.type === 'checkin' ? 'checked in' : 'checked out'}.</p>
+                    <p className="text-[10px] text-slate-400 mt-1">{new Date(notification.type === 'checkin' ? notification.visitor.checkInTime : notification.visitor.checkOutTime).toLocaleString()}</p>
+                  </div>
+                  <button
+                    onClick={() => setNotifications((prev) => prev.filter((item) => item.id !== notification.id))}
+                    className="p-2 rounded-full bg-slate-800/80 hover:bg-slate-700 transition-colors"
+                    aria-label="Dismiss notification"
+                  ><X size={16} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {activeView === 'dashboard' && (
           <div className="animate-in fade-in duration-500">

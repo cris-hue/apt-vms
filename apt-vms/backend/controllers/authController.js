@@ -1,5 +1,48 @@
 const User = require('../models/User'); 
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+
+const createEmailTransporter = () => {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587,
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+};
+
+const sendApprovalEmail = async (user) => {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('Email not sent: SMTP config is missing. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS.');
+    return;
+  }
+
+  const roleText = user.role === 'tenant' ? 'tenant' : 'guard';
+  const subject = 'SecureNest account approved';
+  const text = `Hello ${user.name},\n\nYour SecureNest ${roleText} account has been approved. You can now log in using your registered email address and password.\n\nIf you did not request this access, please contact support.\n\nThanks,\nSecureNest Team`;
+  const html = `
+    <div style="font-family:system-ui, sans-serif; color:#1f2937;">
+      <h2 style="color:#0f172a;">SecureNest Account Approved</h2>
+      <p>Hello ${user.name},</p>
+      <p>Your SecureNest <strong>${roleText}</strong> account has been approved.</p>
+      <p>You can now log in with the email address you registered and your password.</p>
+      <p style="margin-top:24px;">If you forgot your password, use the password reset link on the login page.</p>
+      <p style="margin-top:24px; color:#475569;">Thanks,<br/>SecureNest Team</p>
+    </div>
+  `;
+
+  const transporter = createEmailTransporter();
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+    to: user.email,
+    subject,
+    text,
+    html,
+  });
+};
 
 // @desc    Login user
 exports.loginUser = async (req, res) => {
@@ -42,6 +85,16 @@ exports.getPendingUsers = async (req, res) => {
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
+// @desc    Get all tenant units already taken
+exports.getTakenUnits = async (req, res) => {
+  try {
+    const units = await User.distinct('unitNumber', { role: 'tenant', unitNumber: { $ne: null } });
+    res.status(200).json({ success: true, units });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get all approved users
 exports.getApprovedUsers = async (req, res) => {
   try {
@@ -54,7 +107,15 @@ exports.getApprovedUsers = async (req, res) => {
 // @desc    Approve user account
 exports.approveUser = async (req, res) => {
   try {
-    await User.findByIdAndUpdate(req.params.id, { isApproved: true });
+    const user = await User.findByIdAndUpdate(req.params.id, { isApproved: true }, { new: true });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    sendApprovalEmail(user).catch((err) => {
+      console.error('Approval email failed:', err);
+    });
+
     res.status(200).json({ success: true, message: "User approved" });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -70,9 +131,41 @@ exports.deleteUser = async (req, res) => {
 // @desc    Register user
 exports.registerUser = async (req, res) => {
   try {
-    const { name, email, password, role, phone, unitNumber } = req.body;
+    let { name, email, password, role, phone, unitNumber } = req.body;
+    email = String(email || '').trim().toLowerCase();
+    name = String(name || '').trim();
+    phone = String(phone || '').trim();
+    role = String(role || 'tenant').trim();
+
+    if (!name || !email || !password || !phone || !role) {
+      return res.status(400).json({ success: false, message: 'Please complete all required fields.' });
+    }
+
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(400).json({ success: false, message: 'This email is already in use.' });
+    }
+
+    if (role === 'tenant') {
+      unitNumber = String(unitNumber || '').trim().toUpperCase();
+      if (!unitNumber) {
+        return res.status(400).json({ success: false, message: 'Please select an apartment unit.' });
+      }
+      const existingUnit = await User.findOne({ role: 'tenant', unitNumber });
+      if (existingUnit) {
+        return res.status(400).json({ success: false, message: 'This apartment unit is already taken.' });
+      }
+    } else {
+      unitNumber = undefined;
+    }
+
     const isApproved = role === 'admin';
     const user = await User.create({ name, email, password, role, phone, unitNumber, isApproved });
     res.status(201).json({ success: true, data: user });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'This email is already in use.' });
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
 };

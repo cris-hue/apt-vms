@@ -37,7 +37,8 @@ const InviteModal = ({ isOpen, onClose, user }) => {
       const { data } = await API.post('/visitors/register', formData);
       if (data.success) {
         const token = data.visitor.qrCode;
-        setPassUrl(`${window.location.origin}/visitor/pass/${token}`);
+        const baseUrl = import.meta.env.VITE_PUBLIC_URL || window.location.origin;
+        setPassUrl(`${baseUrl}/visitor/pass/${token}`);
       }
     } catch (err) {
       alert("Error: " + (err.response?.data?.message || "Failed to generate pass"));
@@ -105,7 +106,7 @@ const InviteModal = ({ isOpen, onClose, user }) => {
                   Copy Link
                 </button>
                 <a 
-                  href={`https://wa.me/${formData.phone}?text=${encodeURIComponent(`Hi ${formData.name}, here is your entry pass: ${passUrl}`)}`}
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Hi ${formData.name}, here is your entry pass: ${passUrl}`)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex-1 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-all flex items-center justify-center gap-2"

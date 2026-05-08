@@ -4,6 +4,7 @@ const {
   registerUser, 
   loginUser, 
   getPendingUsers, 
+  getTakenUnits,
   approveUser,
   getApprovedUsers,
   deleteUser,
@@ -15,6 +16,7 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 // --- Public Access Routes ---
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+router.get('/taken-units', getTakenUnits);
 
 // --- Authenticated User Routes (Tenant/Guard/Admin) ---
 /**

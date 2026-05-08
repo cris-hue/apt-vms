@@ -105,6 +105,25 @@ exports.checkInVisitor = async (req, res) => {
     visitor.checkInTime = Date.now();
     visitor.checkedInBy = req.user._id;
     await visitor.save();
+
+    const io = req.app.get('io');
+    if (io && visitor.tenantId) {
+      const room = `tenant_${visitor.tenantId.toString()}`;
+      io.to(room).emit('visitor-status-updated', {
+        type: 'checkin',
+        visitor: {
+          _id: visitor._id,
+          name: visitor.name,
+          status: visitor.status,
+          checkInTime: visitor.checkInTime,
+          checkOutTime: visitor.checkOutTime,
+          purpose: visitor.purpose,
+          phone: visitor.phone,
+          idNumber: visitor.idNumber,
+        },
+      });
+    }
+
     res.status(200).json({ success: true, message: `${visitor.name} checked in.` });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -120,6 +139,25 @@ exports.checkOutVisitor = async (req, res) => {
     visitor.checkOutTime = Date.now();
     visitor.checkedOutBy = req.user._id;
     await visitor.save();
+
+    const io = req.app.get('io');
+    if (io && visitor.tenantId) {
+      const room = `tenant_${visitor.tenantId.toString()}`;
+      io.to(room).emit('visitor-status-updated', {
+        type: 'checkout',
+        visitor: {
+          _id: visitor._id,
+          name: visitor.name,
+          status: visitor.status,
+          checkInTime: visitor.checkInTime,
+          checkOutTime: visitor.checkOutTime,
+          purpose: visitor.purpose,
+          phone: visitor.phone,
+          idNumber: visitor.idNumber,
+        },
+      });
+    }
+
     res.status(200).json({ success: true, message: `${visitor.name} checked out.` });
   } catch (error) {
     res.status(500).json({ message: error.message });

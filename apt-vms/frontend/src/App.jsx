@@ -2,9 +2,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react'; // Added to manage user state
 import Login from './pages/Login';
 import Register from './pages/Register';
+import LandingPage from './pages/LandingPage';
 import TenantDashboard from './pages/TenantDashboard';
 import AdminDashboard from './pages/AdminDashboard';
-import GuardDashboard from './pages/GuardDashboard'; // 1. Added Missing Import
+import GuardDashboard from './pages/GuardDashboard';
 import VisitorPass from './pages/VisitorPass';
 
 function App() {
@@ -31,15 +32,11 @@ function App() {
         {/* Protected Routes - Passing 'user' prop so names/roles show up */}
         <Route path="/tenant-dashboard" element={<TenantDashboard user={user} />} />
         <Route path="/admin" element={<AdminDashboard user={user} />} />
-        
-        {/* 3. Added the Missing Guard Route */}
         <Route path="/guard-dashboard" element={<GuardDashboard user={user} />} />
-        
-        {/* Default Redirect */}
-        <Route path="/" element={<Navigate to="/login" />} />
-        
-        {/* 4. Added a "404" catch-all to prevent future blank screens */}
-        <Route path="*" element={<Navigate to="/login" />} />
+
+        {/* Public and landing routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>
   );

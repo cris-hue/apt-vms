@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import API from '../api/axios';
 import { 
   Users, AlertCircle, RefreshCw, LogOut, ShieldCheck, 
-  ClipboardList, UserPlus, Building2, ChevronRight, X, Info, Mail, Trash2, Clock, CheckCircle2
+  ClipboardList, UserPlus, Building2, ChevronRight, X, Info, Mail, Trash2, Clock, CheckCircle2, Menu
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -129,15 +129,18 @@ const AdminDashboard = () => {
 
       <main className="flex-1 p-6 md:p-12 overflow-y-auto w-full">
         <header className="flex justify-between items-center gap-4 mb-8 md:mb-10">
-          <div>
-            <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">{activeTab.replace('pending', 'Authorization').replace('tenants', 'Residents').replace('guards', 'Security')}</h2>
-            <p className="text-slate-400 font-black mt-1 uppercase text-[10px] tracking-widest text-left">SecureNest Management Terminal</p>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-3 text-slate-900 rounded-xl hover:bg-slate-200 transition-all"><Menu size={24} /></button>
+            <div>
+              <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">{activeTab.replace('pending', 'Authorization').replace('tenants', 'Residents').replace('guards', 'Security')}</h2>
+              <p className="text-slate-400 font-black mt-1 uppercase text-[10px] tracking-widest text-left">SecureNest Management Terminal</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"><ShieldCheck size={24} /></button>
             <button onClick={fetchData} className="p-3 md:p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95">
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
+            <div className="w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-black uppercase shadow-lg">{currentUser?.name?.charAt(0) || 'A'}</div>
           </div>
         </header>
 
@@ -147,7 +150,7 @@ const AdminDashboard = () => {
           <StatBox icon={<Users className="text-green-500"/>} label="Security" count={stats.guards} color="green" />
         </div>
 
-        <div className="bg-white rounded-[2rem] md:rounded-[3rem] shadow-sm border border-slate-200 overflow-x-auto md:overflow-visible overflow-hidden min-h-[400px] relative text-left">
+        <div className="bg-white rounded-[4xl] md:rounded-[3rem] shadow-sm border border-slate-200 overflow-x-auto md:overflow-visible overflow-hidden min-h-[100] relative text-left">
           {activeTab === 'logs' && !loading && !error && (
             <div className="px-6 md:px-10 py-4 md:py-6 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center gap-4 bg-slate-50/30">
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic">Filter Logs:</p>
@@ -254,12 +257,12 @@ const AdminDashboard = () => {
 
       {/* --- MODALS --- */}
       {selectedUser && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 relative shadow-2xl text-left animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-120 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-md rounded-[4xl] md:rounded-[3rem] p-8 md:p-12 relative shadow-2xl text-left animate-in zoom-in-95 duration-200">
             <button onClick={() => setSelectedUser(null)} className="absolute top-6 md:top-10 right-6 md:right-10 text-slate-300 hover:text-slate-600 transition-colors"><X size={28}/></button>
             <h3 className="text-2xl md:text-3xl font-black text-slate-900 uppercase tracking-tighter mb-2">{selectedUser.name}</h3>
             <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-6 md:mb-8 italic">Account Management</p>
-            <div className="space-y-4 mb-8 md:mb-10 bg-slate-50 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100">
+            <div className="space-y-4 mb-8 md:mb-10 bg-slate-50 p-6 md:p-8 rounded-[4xl] md:rounded-[2.5rem] border border-slate-100">
                <DetailField label="Registered Identity" value={selectedUser.email || selectedUser.phone} />
                <DetailField label="Assigned Role" value={selectedUser.role} />
             </div>
@@ -269,15 +272,15 @@ const AdminDashboard = () => {
       )}
 
       {selectedLog && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-[2rem] md:rounded-[3rem] shadow-2xl p-8 md:p-12 text-left animate-in zoom-in-95 duration-200 relative">
+        <div className="fixed inset-0 z-120 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-md rounded-[4xl] md:rounded-[3rem] shadow-2xl p-8 md:p-12 text-left animate-in zoom-in-95 duration-200 relative">
             <button onClick={() => setSelectedLog(null)} className="absolute top-6 md:top-10 right-6 md:right-10 text-slate-300 hover:text-slate-900"><X size={28}/></button>
             <div className="mb-8 md:mb-10 text-center">
                <div className="w-16 md:w-20 h-16 md:h-20 bg-blue-600 text-white rounded-3xl flex items-center justify-center text-2xl md:text-3xl font-black mx-auto mb-4 md:mb-6 shadow-xl">{selectedLog.name.charAt(0)}</div>
                <h3 className="text-2xl md:text-3xl font-black text-slate-900 uppercase tracking-tighter">{selectedLog.name}</h3>
                <span className="inline-block mt-2 text-[9px] bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-black uppercase tracking-widest">{selectedLog.status} LOG</span>
             </div>
-            <div className="space-y-4 md:space-y-6 bg-slate-50 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100">
+            <div className="space-y-4 md:space-y-6 bg-slate-50 p-6 md:p-8 rounded-[4xl] md:rounded-[2.5rem] border border-slate-100">
               <DetailField label="Identity Ref" value={selectedLog.idNumber} />
               <DetailField label="Host Tenant" value={`Unit ${selectedLog.tenantId?.unitNumber} (${selectedLog.tenantId?.name})`} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 md:pt-6 border-t border-slate-200/50">
