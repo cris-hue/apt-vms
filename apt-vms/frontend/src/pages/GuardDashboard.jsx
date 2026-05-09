@@ -157,7 +157,7 @@ const GuardDashboard = () => {
       </aside>
 
       {/* --- MAIN CONTENT (Responsive) --- */}
-      <main className="flex-1 min-h-0 p-6 md:p-12 overflow-hidden w-full flex flex-col">
+      <main className="flex-1 min-h-0 p-6 md:p-12 h-[100dvh] overflow-hidden w-full flex flex-col">
         <header className="flex justify-between items-center mb-8 md:mb-10 text-left gap-4">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden p-3 text-slate-900 rounded-xl hover:bg-slate-100 transition-all">

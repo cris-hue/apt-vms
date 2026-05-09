@@ -146,8 +146,8 @@ Use this link: ${passUrl}`;
         </div>
       </aside>
 
-      <main className="flex-1 p-6 md:p-12 overflow-y-auto">
-        <header className="relative flex flex-col md:flex-row justify-between items-start md:items-center mb-10 text-left gap-4 pr-16">
+      <main className="flex-1 p-6 md:p-12 h-[100dvh] flex flex-col overflow-hidden w-full">
+        <header className="relative flex flex-col md:flex-row justify-between items-start md:items-center mb-10 text-left gap-4 pr-16 flex-shrink-0">
           <div className="flex items-center gap-4">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 text-slate-900 rounded-lg hover:bg-slate-200 transition-colors"><Menu size={20} /></button>
             <div>
@@ -183,26 +183,26 @@ Use this link: ${passUrl}`;
         )}
 
         {activeView === 'dashboard' && (
-          <div className="animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 text-left">
+          <div className="animate-in fade-in duration-500 flex flex-col flex-1 min-h-0 pb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 text-left flex-shrink-0">
               <StatBox icon={<Activity className="text-blue-500"/>} label="Visits this Month" count={history.filter(v => v.status !== 'Pending').length} color="blue" />
               <StatBox icon={<CheckCircle2 className="text-green-500"/>} label="Currently Inside" count={history.filter(v => v.status === 'Checked-In').length} color="green" />
               <StatBox icon={<Clock className="text-orange-500"/>} label="Pending Invites" count={history.filter(v => v.status === 'Pending').length} color="orange" />
             </div>
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden text-left">
-               <div className="px-10 py-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden text-left">
+               <div className="px-10 py-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center flex-shrink-0">
                   <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Recent Activity</h3>
                   <button onClick={() => setActiveView('active')} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Manage All</button>
                </div>
-               <div className="divide-y divide-slate-50">
-                  {history.slice(0, 5).map(v => <VisitorRow key={v._id} visitor={v} />)}
+               <div className="divide-y divide-slate-50 flex-1 overflow-y-auto min-h-0">
+                  {history.map(v => <VisitorRow key={v._id} visitor={v} />)}
                </div>
             </div>
           </div>
         )}
 
         {activeView === 'profile' && (
-          <div className="max-w-5xl animate-in slide-in-from-bottom-4 duration-300 text-left">
+          <div className="max-w-5xl animate-in slide-in-from-bottom-4 duration-300 text-left flex-1 overflow-y-auto min-h-0 pr-2 pb-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="md:col-span-1">
                 <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 text-center shadow-sm">
@@ -235,13 +235,13 @@ Use this link: ${passUrl}`;
         )}
 
         {(activeView === 'active' || activeView === 'history') && (
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-300 text-left">
-            <div className="px-10 py-8 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center text-left">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden animate-in slide-in-from-bottom-4 duration-300 text-left">
+            <div className="px-10 py-8 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center text-left flex-shrink-0">
                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 italic">
                  {activeView === 'active' ? 'Pending Invitations' : 'Complete Visitor Registry'}
                </h3>
             </div>
-            <div className="divide-y divide-slate-50">
+            <div className="divide-y divide-slate-50 flex-1 overflow-y-auto min-h-0">
               {history.filter(v => activeView === 'active' ? v.status === 'Pending' : v.status !== 'Pending').map(v => (
                 <div key={v._id} className="px-10 py-7 flex items-center justify-between group hover:bg-blue-50/20 transition-all text-left">
                   <div className="flex items-center gap-6">
