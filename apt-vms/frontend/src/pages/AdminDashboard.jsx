@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import API from '../api/axios';
 import { 
   Users, AlertCircle, RefreshCw, LogOut, ShieldCheck, 
-  ClipboardList, UserPlus, Building2, ChevronRight, X, Info, Mail, Trash2, Clock, CheckCircle2, Menu
+  ClipboardList, UserPlus, Building2, ChevronRight, X, Info, Mail, Trash2, Clock, CheckCircle2, Menu, Download
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -15,6 +15,9 @@ const AdminDashboard = () => {
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({ pending: 0, tenants: 0, guards: 0 });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
   
   const [selectedLog, setSelectedLog] = useState(null); 
   const [selectedUser, setSelectedUser] = useState(null);
@@ -88,6 +91,64 @@ const AdminDashboard = () => {
     } catch (err) { alert("Revoke failed"); }
   };
 
+  const handleDownloadReport = async () => {
+    if (!reportStartDate || !reportEndDate) {
+      alert("Please select both start and end dates.");
+      return;
+    }
+    
+    try {
+      const res = await API.get('/visitors/all');
+      const allVisitors = res.data?.data || [];
+      
+      const start = new Date(reportStartDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(reportEndDate);
+      end.setHours(23, 59, 59, 999);
+      
+      const filtered = allVisitors.filter(v => {
+        const d = new Date(v.createdAt || v.checkInTime || Date.now());
+        return d >= start && d <= end;
+      });
+
+      if (filtered.length === 0) {
+        alert("No records found in this date range.");
+        return;
+      }
+
+      const headers = ['Name', 'Phone/Email', 'ID Number', 'Purpose', 'Status', 'Host Unit', 'Host Name', 'Check In', 'Check Out'];
+      const csvRows = [headers.join(',')];
+      
+      filtered.forEach(v => {
+        const row = [
+          `"${v.name || ''}"`,
+          `"${v.phone || v.email || ''}"`,
+          `"${v.idNumber || ''}"`,
+          `"${v.purpose || ''}"`,
+          `"${v.status || ''}"`,
+          `"${v.tenantId?.unitNumber || ''}"`,
+          `"${v.tenantId?.name || ''}"`,
+          `"${v.checkInTime ? new Date(v.checkInTime).toLocaleString() : ''}"`,
+          `"${v.checkOutTime ? new Date(v.checkOutTime).toLocaleString() : ''}"`
+        ];
+        csvRows.push(row.join(','));
+      });
+      
+      const csvString = csvRows.join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `Visitor_Report_${reportStartDate}_to_${reportEndDate}.csv`);
+      a.click();
+      
+      setShowReportModal(false);
+    } catch (err) {
+      console.error("Error generating report", err);
+      alert("Failed to generate report.");
+    }
+  };
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans text-slate-900 text-left">
       
@@ -137,7 +198,11 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={fetchData} className="p-3 md:p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95">
+            <button onClick={() => setShowReportModal(true)} className="p-3 md:p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95 flex items-center gap-2" title="Download Report">
+              <Download size={20} />
+              <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest">Report</span>
+            </button>
+            <button onClick={fetchData} className="p-3 md:p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95" title="Refresh Data">
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
             <div className="w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-black uppercase shadow-lg">{currentUser?.name?.charAt(0) || 'A'}</div>
@@ -284,11 +349,45 @@ const AdminDashboard = () => {
               <DetailField label="Identity Ref" value={selectedLog.idNumber} />
               <DetailField label="Host Tenant" value={`Unit ${selectedLog.tenantId?.unitNumber} (${selectedLog.tenantId?.name})`} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 md:pt-6 border-t border-slate-200/50">
-                <DetailField label="Check-In" value={selectedLog.checkInTime ? new Date(selectedLog.checkInTime).toLocaleTimeString() : 'N/A'} />
-                <DetailField label="Check-Out" value={selectedLog.checkOutTime ? new Date(selectedLog.checkOutTime).toLocaleTimeString() : 'Active'} />
+                <DetailField label="Check-In" value={selectedLog.checkInTime ? new Date(selectedLog.checkInTime).toLocaleString() : 'N/A'} />
+                <DetailField label="Check-Out" value={selectedLog.checkOutTime ? new Date(selectedLog.checkOutTime).toLocaleString() : 'Active'} />
               </div>
             </div>
             <button onClick={() => setSelectedLog(null)} className="w-full mt-8 md:mt-10 bg-slate-900 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all shadow-xl">Dismiss Log</button>
+          </div>
+        </div>
+      )}
+
+      {/* DOWNLOAD REPORT MODAL */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-120 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-md rounded-[4xl] md:rounded-[3rem] p-8 md:p-12 relative shadow-2xl text-left animate-in zoom-in-95 duration-200">
+            <button onClick={() => setShowReportModal(false)} className="absolute top-6 md:top-10 right-6 md:right-10 text-slate-300 hover:text-slate-600 transition-colors"><X size={28}/></button>
+            <h3 className="text-2xl md:text-3xl font-black text-slate-900 uppercase tracking-tighter mb-2">Download Report</h3>
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-6 md:mb-8 italic">Export Visitor Logs to CSV</p>
+            
+            <div className="space-y-4 mb-8 md:mb-10 bg-slate-50 p-6 md:p-8 rounded-[4xl] md:rounded-[2.5rem] border border-slate-100">
+              <div>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">Start Date</label>
+                <input 
+                  type="date" 
+                  value={reportStartDate}
+                  onChange={(e) => setReportStartDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">End Date</label>
+                <input 
+                  type="date" 
+                  value={reportEndDate}
+                  onChange={(e) => setReportEndDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <button onClick={handleDownloadReport} className="w-full bg-blue-600 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-xl">Generate & Download CSV</button>
           </div>
         </div>
       )}
