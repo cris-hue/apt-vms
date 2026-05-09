@@ -32,6 +32,17 @@ const InviteModal = ({ isOpen, onClose, user }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!/^\d{10}$/.test(formData.phone)) {
+      return alert("Phone number must be exactly 10 digits.");
+    }
+    if (!/^\d+$/.test(formData.idNumber)) {
+      return alert("ID field cannot contain letters, only numbers are allowed.");
+    }
+    if (!/^[A-Z]/.test(formData.name)) {
+      return alert("Name must start with a capital letter.");
+    }
+
     setLoading(true);
     try {
       const { data } = await API.post('/visitors/register', formData);

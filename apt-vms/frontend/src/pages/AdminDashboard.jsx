@@ -188,8 +188,8 @@ const AdminDashboard = () => {
         </div>
       </aside>
 
-      <main className="flex-1 p-6 md:p-12 overflow-y-auto w-full">
-        <header className="flex justify-between items-center gap-4 mb-8 md:mb-10">
+      <main className="flex-1 p-6 md:p-12 h-[100dvh] flex flex-col overflow-hidden w-full">
+        <header className="flex justify-between items-center gap-4 mb-8 md:mb-10 flex-shrink-0">
           <div className="flex items-center gap-4">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden p-3 text-slate-900 rounded-xl hover:bg-slate-200 transition-all"><Menu size={24} /></button>
             <div>
@@ -209,15 +209,15 @@ const AdminDashboard = () => {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10 text-left">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10 text-left flex-shrink-0">
           <StatBox icon={<Clock className="text-orange-500"/>} label="Pending" count={stats.pending} color="orange" />
           <StatBox icon={<Building2 className="text-blue-500"/>} label="Residents" count={stats.tenants} color="blue" />
           <StatBox icon={<Users className="text-green-500"/>} label="Security" count={stats.guards} color="green" />
         </div>
 
-        <div className="bg-white rounded-[4xl] md:rounded-[3rem] shadow-sm border border-slate-200 overflow-x-auto md:overflow-visible overflow-hidden min-h-[100] relative text-left">
+        <div className="bg-white rounded-[4xl] md:rounded-[3rem] shadow-sm border border-slate-200 flex flex-col flex-1 min-h-0 relative text-left overflow-hidden">
           {activeTab === 'logs' && !loading && !error && (
-            <div className="px-6 md:px-10 py-4 md:py-6 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center gap-4 bg-slate-50/30">
+            <div className="px-6 md:px-10 py-4 md:py-6 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center gap-4 bg-slate-50/30 flex-shrink-0">
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic">Filter Logs:</p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -276,46 +276,48 @@ const AdminDashboard = () => {
                <button onClick={fetchData} className="mt-4 bg-slate-900 text-white px-6 md:px-8 py-3 md:py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Retry Sync</button>
             </div>
           ) : (
-            <table className="w-full text-left min-w-max md:min-w-full">
-              <thead className="bg-slate-50/50 border-b border-slate-100">
-                <tr>
-                  <th className="px-6 md:px-10 py-4 md:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Identification</th>
-                  <th className="px-6 md:px-10 py-4 md:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status / Role</th>
-                  <th className="px-6 md:px-10 py-4 md:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {data.length === 0 ? (
-                  <tr><td colSpan="3" className="py-20 md:py-32 px-6 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">No records found</td></tr>
-                ) : (
-                  (activeTab === 'logs' && logFilter !== 'all'
-                    ? data.filter(item => item.status === logFilter)
-                    : data
-                  ).map((item) => (
-                    <tr key={item._id} className="hover:bg-blue-50/20 transition-colors group">
-                      <td className="px-6 md:px-10 py-5 md:py-7">
-                        <p className="font-black text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors text-sm md:text-base">{item.name}</p>
-                        <p className="text-[10px] md:text-[11px] text-slate-400 font-bold mt-0.5 italic">{item.email || item.phone}</p>
-                      </td>
-                      <td className="px-6 md:px-10 py-5 md:py-7 text-center">
-                        <span className="bg-blue-50 text-blue-600 border border-blue-100 px-3 md:px-4 py-1 md:py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest italic whitespace-nowrap">
-                          {item.role} {item.unitNumber ? `• Unit ${item.unitNumber}` : ''} {item.status ? `• ${item.status}` : ''}
-                        </span>
-                      </td>
-                      <td className="px-6 md:px-10 py-5 md:py-7 text-right">
-                        {activeTab === 'pending' ? (
-                          <button onClick={() => handleApprove(item._id)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg whitespace-nowrap">Approve Access</button>
-                        ) : (
-                          <button onClick={() => activeTab === 'logs' ? setSelectedLog(item) : setSelectedUser(item)} className="p-2 md:p-3 bg-slate-50 text-slate-300 hover:text-blue-600 hover:bg-white hover:shadow-md rounded-xl transition-all">
-                            {activeTab === 'logs' ? <Info size={18} /> : <ChevronRight size={18}/>}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 relative">
+              <table className="w-full text-left min-w-max md:min-w-full">
+                <thead className="bg-slate-50/90 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-6 md:px-10 py-4 md:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Identification</th>
+                    <th className="px-6 md:px-10 py-4 md:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status / Role</th>
+                    <th className="px-6 md:px-10 py-4 md:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {data.length === 0 ? (
+                    <tr><td colSpan="3" className="py-20 md:py-32 px-6 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">No records found</td></tr>
+                  ) : (
+                    (activeTab === 'logs' && logFilter !== 'all'
+                      ? data.filter(item => item.status === logFilter)
+                      : data
+                    ).map((item) => (
+                      <tr key={item._id} className="hover:bg-blue-50/20 transition-colors group">
+                        <td className="px-6 md:px-10 py-5 md:py-7">
+                          <p className="font-black text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors text-sm md:text-base">{item.name}</p>
+                          <p className="text-[10px] md:text-[11px] text-slate-400 font-bold mt-0.5 italic">{item.email || item.phone}</p>
+                        </td>
+                        <td className="px-6 md:px-10 py-5 md:py-7 text-center">
+                          <span className="bg-blue-50 text-blue-600 border border-blue-100 px-3 md:px-4 py-1 md:py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest italic whitespace-nowrap">
+                            {item.role} {item.unitNumber ? `• Unit ${item.unitNumber}` : ''} {item.status ? `• ${item.status}` : ''}
+                          </span>
+                        </td>
+                        <td className="px-6 md:px-10 py-5 md:py-7 text-right">
+                          {activeTab === 'pending' ? (
+                            <button onClick={() => handleApprove(item._id)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg whitespace-nowrap">Approve Access</button>
+                          ) : (
+                            <button onClick={() => activeTab === 'logs' ? setSelectedLog(item) : setSelectedUser(item)} className="p-2 md:p-3 bg-slate-50 text-slate-300 hover:text-blue-600 hover:bg-white hover:shadow-md rounded-xl transition-all">
+                              {activeTab === 'logs' ? <Info size={18} /> : <ChevronRight size={18}/>}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </main>
