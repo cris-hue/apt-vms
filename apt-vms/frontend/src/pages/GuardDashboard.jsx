@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect, useRef } from 'react';
+import { useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import API from '../api/axios';
 import { 
@@ -8,6 +8,7 @@ import {
   ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode'; 
+import { io } from 'socket.io-client';
 
 const GuardDashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -39,14 +40,26 @@ const GuardDashboard = () => {
     }
   }, [message]);
 
-  const fetchVisitors = async () => {
+  const fetchVisitors = useCallback(async () => {
     try {
       const { data } = await API.get('/visitors/all');
       setVisitors(data.data || []);
     } catch (err) { console.error("Sync Error:", err); }
-  };
+  }, []);
 
-  useEffect(() => { fetchVisitors(); }, []);
+  useEffect(() => { fetchVisitors(); }, [fetchVisitors]);
+
+  useEffect(() => {
+    if (!user) return;
+    const socketServer = API.defaults.baseURL?.replace(/\/api\/?$/, '') || window.location.origin;
+    const socket = io(socketServer, { transports: ['websocket'] });
+
+    socket.on('global-update', () => {
+      fetchVisitors();
+    });
+
+    return () => socket.disconnect();
+  }, [user, fetchVisitors]);
 
   // 2. VERIFICATION LOGIC
   const processVerification = async (codeToVerify) => {
@@ -176,7 +189,7 @@ const GuardDashboard = () => {
       </aside>
 
       {/* --- MAIN CONTENT (Responsive) --- */}
-      <main className="flex-1 min-h-0 p-6 md:p-12 h-[100dvh] overflow-hidden w-full flex flex-col">
+      <main className="flex-1 min-h-0 p-6 md:p-12 h-dvh overflow-hidden w-full flex flex-col">
         <header className="flex justify-between items-center mb-8 md:mb-10 text-left gap-4">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden p-3 text-slate-900 rounded-xl hover:bg-slate-100 transition-all">
@@ -220,7 +233,7 @@ const GuardDashboard = () => {
                    />
                  </div>
                )}
-               <button onClick={fetchVisitors} className="p-2 md:p-3 text-slate-400 hover:text-blue-600 transition-all bg-white rounded-xl shadow-sm flex-shrink-0"><Activity size={18}/></button>
+               <button onClick={fetchVisitors} className="p-2 md:p-3 text-slate-400 hover:text-blue-600 transition-all bg-white rounded-xl shadow-sm shrink-0"><Activity size={18}/></button>
              </div>
           </div>
           <div className="divide-y divide-slate-50 overflow-y-auto flex-1 min-h-0">
@@ -251,7 +264,7 @@ const GuardDashboard = () => {
             )}
           </div>
           {/* Pagination Controls */}
-          <div className="border-t border-slate-100 p-4 bg-slate-50 flex flex-col sm:flex-row items-center justify-between flex-shrink-0 gap-4">
+          <div className="border-t border-slate-100 p-4 bg-slate-50 flex flex-col sm:flex-row items-center justify-between shrink-0 gap-4">
              <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-slate-400">
                Showing {filteredList.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredList.length)} of {filteredList.length} entries
              </span>
@@ -404,7 +417,7 @@ const StatBox = ({ icon, label, count, color }) => (
     <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl bg-${color}-50 shrink-0`}>{icon}</div>
     <div className="min-w-0 flex-1 text-left">
       <p className="text-xl md:text-2xl font-black text-slate-900 leading-none truncate">{count}</p>
-      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 md:mt-1.5 italic leading-tight break-words">{label}</p>
+      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 md:mt-1.5 italic leading-tight wrap-break-word">{label}</p>
     </div>
   </div>
 );

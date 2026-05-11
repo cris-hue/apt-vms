@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Search } from 'lucide-react';
 import { ShieldAlert } from 'lucide-react';
+import { io } from 'socket.io-client';
 
 const AdminDashboard = () => {
   const { user: currentUser, logout } = useContext(AuthContext);
@@ -84,6 +85,18 @@ const AdminDashboard = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, logFilter, searchQuery]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const socketServer = API.defaults.baseURL?.replace(/\/api\/?$/, '') || window.location.origin;
+    const socket = io(socketServer, { transports: ['websocket'] });
+
+    socket.on('global-update', () => {
+      fetchData();
+    });
+
+    return () => socket.disconnect();
+  }, [currentUser, fetchData]);
 
   const handleApprove = async (id) => {
     try {
@@ -228,16 +241,16 @@ const AdminDashboard = () => {
         </div>
       </aside>
 
-      <main className="flex-1 p-4 sm:p-6 md:p-8 h-[100dvh] flex flex-col overflow-hidden w-full">
-        <header className="flex justify-between items-center gap-2 md:gap-4 mb-6 md:mb-8 flex-shrink-0">
+      <main className="flex-1 p-4 sm:p-6 md:p-8 h-dvh flex flex-col overflow-hidden w-full">
+        <header className="flex justify-between items-center gap-2 md:gap-4 mb-6 md:mb-8 shrink-0">
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-2 text-slate-900 rounded-xl hover:bg-slate-200 transition-all flex-shrink-0"><Menu size={24} /></button>
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-2 text-slate-900 rounded-xl hover:bg-slate-200 transition-all shrink-0"><Menu size={24} /></button>
             <div className="min-w-0">
               <h2 className="text-xl sm:text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none truncate">{activeTab.replace('pending', 'Authorization').replace('tenants', 'Residents').replace('guards', 'Security')}</h2>
               <p className="hidden sm:block text-slate-400 font-black mt-1 uppercase text-[10px] tracking-widest text-left truncate">SecureNest Management Terminal</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <button onClick={() => setShowReportModal(true)} className="px-3 py-2 md:p-4 bg-white border border-slate-200 rounded-xl md:rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95 flex items-center gap-1.5 md:gap-2" title="Download Report">
               <Download size={16} className="md:w-5 md:h-5" />
               <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Report</span>
@@ -245,12 +258,12 @@ const AdminDashboard = () => {
             <button onClick={fetchData} className="hidden md:flex p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95 items-center justify-center" title="Refresh Data">
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
-            <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs md:text-sm font-black uppercase shadow-lg flex-shrink-0">{currentUser?.name?.charAt(0) || 'A'}</div>
+            <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs md:text-sm font-black uppercase shadow-lg shrink-0">{currentUser?.name?.charAt(0) || 'A'}</div>
           </div>
         </header>
 
         {/* Tailwind Safelist: bg-indigo-50 text-indigo-500 bg-red-50 text-red-500 */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8 text-left flex-shrink-0">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8 text-left shrink-0">
           <StatBox icon={<Clock className="text-orange-500"/>} label="Pending" count={stats.pending} color="orange" />
           <StatBox icon={<Building2 className="text-blue-500"/>} label="Residents" count={stats.tenants} color="blue" />
           <StatBox icon={<Users className="text-green-500"/>} label="Security" count={stats.guards} color="green" />
@@ -260,7 +273,7 @@ const AdminDashboard = () => {
 
         <div className="bg-white rounded-[4xl] md:rounded-[3rem] shadow-sm border border-slate-200 flex flex-col flex-1 min-h-0 relative text-left overflow-hidden">
           {activeTab === 'logs' && !loading && !error && (
-            <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-50 bg-slate-50/30 flex flex-col text-left flex-shrink-0 gap-4 md:gap-5">
+            <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-50 bg-slate-50/30 flex flex-col text-left shrink-0 gap-4 md:gap-5">
               <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic whitespace-nowrap">Filter Logs:</p>
                 <div className="flex flex-wrap gap-2">
@@ -344,47 +357,39 @@ const AdminDashboard = () => {
             </div>
           ) : (
             <div className="flex flex-col flex-1 min-h-0">
-             <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 relative">
-              <table className="w-full text-left min-w-max md:min-w-full">
-                <thead className="bg-slate-50/90 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-6 md:px-8 py-3 md:py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Identification</th>
-                    <th className="px-6 md:px-8 py-3 md:py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status / Role</th>
-                    <th className="px-6 md:px-8 py-3 md:py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {currentData.length === 0 ? (
-                    <tr><td colSpan="3" className="py-20 md:py-32 px-6 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">No records found</td></tr>
-                  ) : (
-                    currentData.map((item) => (
-                      <tr key={item._id} className="hover:bg-blue-50/20 transition-colors group">
-                        <td className="px-6 md:px-8 py-4 md:py-5">
-                          <p className="font-black text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors text-sm">{item.name}</p>
-                          <p className="text-[10px] text-slate-400 font-bold mt-0.5 italic">{item.email || item.phone}</p>
-                        </td>
-                        <td className="px-6 md:px-8 py-4 md:py-5 text-center">
-                          <span className={`px-3 md:px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest italic whitespace-nowrap border ${item.status === 'Expired' ? 'bg-red-50 text-red-600 border-red-100' : item.status === 'Checked-In' ? (isOverdue(item) ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100') : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                            {item.role} {item.unitNumber ? `• Unit ${item.unitNumber}` : ''} {item.status ? `• ${item.status}` : ''}
-                          </span>
-                        </td>
-                        <td className="px-6 md:px-8 py-4 md:py-5 text-right">
-                          {activeTab === 'pending' ? (
-                            <button onClick={() => handleApprove(item._id)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg whitespace-nowrap">Approve Access</button>
-                          ) : (
-                            <button onClick={() => activeTab === 'logs' ? setSelectedLog(item) : setSelectedUser(item)} className="p-2 bg-slate-50 text-slate-300 hover:text-blue-600 hover:bg-white hover:shadow-md rounded-xl transition-all">
-                              {activeTab === 'logs' ? <Info size={18} /> : <ChevronRight size={18}/>}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+             <div className="divide-y divide-slate-50 flex-1 overflow-y-auto min-h-0">
+                {currentData.length === 0 ? (
+                  <div className="py-20 md:py-32 px-6 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">No records found</div>
+                ) : (
+                  currentData.map((item) => (
+                    <div key={item._id} className="px-6 md:px-8 py-4 md:py-5 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:bg-blue-50/20 transition-all text-left">
+                      <div className="flex items-center gap-4 md:gap-6 min-w-0 pr-2">
+                        <div className={`w-12 md:w-14 h-12 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-lg transition-colors shrink-0 ${item.status === 'Expired' ? 'bg-red-50 text-red-600' : item.status === 'Checked-In' ? (isOverdue(item) ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600') : 'bg-slate-100 text-slate-400'}`}>
+                          {item.name ? String(item.name).charAt(0).toUpperCase() : 'U'}
+                        </div>
+                        <div className="min-w-0 truncate">
+                          <h4 className="font-black text-slate-800 uppercase tracking-tight text-sm group-hover:text-blue-600 transition-colors truncate">{item.name}</h4>
+                          <p className="text-[10px] text-slate-400 font-bold mt-0.5 italic truncate">{item.email || item.phone}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto shrink-0">
+                        <span className={`px-3 md:px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest italic whitespace-nowrap border ${item.status === 'Expired' ? 'bg-red-50 text-red-600 border-red-100' : item.status === 'Checked-In' ? (isOverdue(item) ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100') : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                          {item.role} {item.unitNumber ? `• Unit ${item.unitNumber}` : ''} {item.status ? `• ${item.status}` : ''}
+                        </span>
+                        {activeTab === 'pending' ? (
+                          <button onClick={() => handleApprove(item._id)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg whitespace-nowrap">Approve Access</button>
+                        ) : (
+                          <button onClick={() => activeTab === 'logs' ? setSelectedLog(item) : setSelectedUser(item)} className="p-2 bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md rounded-xl transition-all">
+                            {activeTab === 'logs' ? <Info size={18} /> : <ChevronRight size={18}/>}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
              </div>
              {/* Pagination Controls */}
-             <div className="border-t border-slate-100 p-4 bg-slate-50 flex flex-col sm:flex-row items-center justify-between flex-shrink-0 gap-4">
+             <div className="border-t border-slate-100 p-4 bg-slate-50 flex flex-col sm:flex-row items-center justify-between shrink-0 gap-4">
                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">
                  Showing {filteredData.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} entries
                </span>
@@ -499,7 +504,7 @@ const StatBox = ({ icon, label, count, color }) => (
     <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl bg-${color}-50 shrink-0`}>{icon}</div>
     <div className="min-w-0 flex-1">
       <p className="text-xl md:text-2xl font-black text-slate-900 leading-none truncate">{count}</p>
-      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 md:mt-1.5 italic leading-tight break-words">{label}</p>
+      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 md:mt-1.5 italic leading-tight wrap-break-word">{label}</p>
     </div>
   </div>
 );

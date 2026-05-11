@@ -57,6 +57,10 @@ const TenantDashboard = () => {
       fetchHistory();
     });
 
+    socket.on('global-update', () => {
+      fetchHistory();
+    });
+
     socket.on('connect_error', (err) => {
       console.error('Tenant socket connect error:', err);
     });
@@ -177,8 +181,8 @@ Use this link: ${passUrl}`;
         </div>
       </aside>
 
-      <main className="flex-1 p-6 md:p-12 h-[100dvh] flex flex-col overflow-hidden w-full">
-        <header className="flex justify-between items-center gap-4 mb-8 md:mb-10 flex-shrink-0">
+      <main className="flex-1 p-6 md:p-12 h-dvh flex flex-col overflow-hidden w-full">
+        <header className="flex justify-between items-center gap-4 mb-8 md:mb-10 shrink-0">
           <div className="flex items-center gap-3 md:gap-4">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-2 text-slate-900 rounded-lg hover:bg-slate-200 transition-colors"><Menu size={24} /></button>
             <div>
@@ -203,7 +207,7 @@ Use this link: ${passUrl}`;
               </button>
 
               {isNotificationsOpen && (
-                <div className="absolute top-full right-[-44px] md:right-0 mt-2 w-[85vw] sm:w-80 max-w-sm bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden text-left animate-in slide-in-from-top-2">
+                <div className="absolute top-full -right-11 md:right-0 mt-2 w-[85vw] sm:w-80 max-w-sm bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden text-left animate-in slide-in-from-top-2">
                   <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Notifications</h4>
                     {notifications.length > 0 && (
@@ -231,14 +235,14 @@ Use this link: ${passUrl}`;
 
         {activeView === 'dashboard' && (
           <div className="animate-in fade-in duration-500 flex flex-col flex-1 min-h-0 pb-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10 text-left flex-shrink-0">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10 text-left shrink-0">
               <StatBox icon={<Activity className="text-blue-500"/>} label="Completed Visits" count={history.filter(v => v.status === 'Checked-Out').length} color="blue" />
               <StatBox icon={<CheckCircle2 className="text-green-500"/>} label="Currently Inside" count={history.filter(v => v.status === 'Checked-In').length} color="green" />
               <StatBox icon={<Clock className="text-orange-500"/>} label="Pending Invites" count={history.filter(v => v.status === 'Pending').length} color="orange" />
               <StatBox icon={<ShieldAlert className="text-red-500"/>} label="Expired Passes" count={history.filter(v => v.status === 'Expired').length} color="red" />
             </div>
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden text-left">
-               <div className="px-10 py-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center flex-shrink-0">
+               <div className="px-10 py-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center shrink-0">
                   <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Recent Activity</h3>
                   <button onClick={() => setActiveView('active')} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Manage All</button>
                </div>
@@ -284,7 +288,7 @@ Use this link: ${passUrl}`;
 
         {(activeView === 'active' || activeView === 'history') && (
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden animate-in slide-in-from-bottom-4 duration-300 text-left">
-            <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-50 bg-slate-50/50 flex flex-col text-left flex-shrink-0 gap-4 md:gap-5">
+            <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-50 bg-slate-50/50 flex flex-col text-left shrink-0 gap-4 md:gap-5">
                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 italic whitespace-nowrap">
                    {activeView === 'active' ? 'Pending Invitations' : 'Complete Visitor Registry'}
@@ -349,7 +353,7 @@ Use this link: ${passUrl}`;
               )}
             </div>
             {/* Pagination Controls */}
-            <div className="border-t border-slate-100 p-4 bg-slate-50 flex flex-col sm:flex-row items-center justify-between flex-shrink-0 gap-4">
+            <div className="border-t border-slate-100 p-4 bg-slate-50 flex flex-col sm:flex-row items-center justify-between shrink-0 gap-4">
               <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">
                 Showing {filteredHistory.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredHistory.length)} of {filteredHistory.length} entries
               </span>
@@ -439,7 +443,7 @@ const StatBox = ({ icon, label, count, color }) => (
     <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl bg-${color}-50 shrink-0`}>{icon}</div>
     <div className="min-w-0 flex-1">
       <p className="text-xl md:text-2xl font-black text-slate-900 leading-none truncate">{count}</p>
-      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 md:mt-1.5 italic leading-tight break-words">{label}</p>
+      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 md:mt-1.5 italic leading-tight wrap-break-word">{label}</p>
     </div>
   </div>
 );

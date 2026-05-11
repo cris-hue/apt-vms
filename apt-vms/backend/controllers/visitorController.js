@@ -1,6 +1,7 @@
 const Visitor = require('../models/Visitor');
 const QRCode = require('qrcode');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 // Helper function to auto-expire passes that passed 10:00 PM
 const autoExpirePasses = async () => {
@@ -39,13 +40,16 @@ exports.registerVisitor = async (req, res) => {
   try {
     const { name, idNumber, gender, phone, purpose } = req.body;
     const tenantId = new mongoose.Types.ObjectId(req.user._id || req.user.id);
-    const qrData = `VMS-${idNumber}-${Date.now()}`;
+    const qrData = `VMS-${idNumber}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     const qrCodeImage = await QRCode.toDataURL(qrData);
 
     const visitor = await Visitor.create({
       name, idNumber, gender, phone, purpose,
       tenantId, qrCode: qrData,
     });
+
+    const io = req.app.get('io');
+    if (io) io.emit('global-update');
 
     res.status(201).json({ success: true, visitor, qrCodeImage });
   } catch (error) {
@@ -79,6 +83,9 @@ exports.updateVisitor = async (req, res) => {
       returnDocument: 'after', runValidators: true
     });
 
+    const io = req.app.get('io');
+    if (io) io.emit('global-update');
+
     res.status(200).json({ success: true, data: visitor });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -98,6 +105,9 @@ exports.deleteVisitor = async (req, res) => {
 
     // This log confirms it's gone from MongoDB
     console.log(`DATABASE: Visitor ${visitorId} permanently deleted.`);
+
+    const io = req.app.get('io');
+    if (io) io.emit('global-update');
 
     res.status(200).json({ 
       success: true, 
@@ -148,21 +158,24 @@ exports.checkInVisitor = async (req, res) => {
     await visitor.save();
 
     const io = req.app.get('io');
-    if (io && visitor.tenantId) {
-      const room = `tenant_${visitor.tenantId.toString()}`;
-      io.to(room).emit('visitor-status-updated', {
-        type: 'checkin',
-        visitor: {
-          _id: visitor._id,
-          name: visitor.name,
-          status: visitor.status,
-          checkInTime: visitor.checkInTime,
-          checkOutTime: visitor.checkOutTime,
-          purpose: visitor.purpose,
-          phone: visitor.phone,
-          idNumber: visitor.idNumber,
-        },
-      });
+    if (io) {
+      io.emit('global-update');
+      if (visitor.tenantId) {
+        const room = `tenant_${visitor.tenantId.toString()}`;
+        io.to(room).emit('visitor-status-updated', {
+          type: 'checkin',
+          visitor: {
+            _id: visitor._id,
+            name: visitor.name,
+            status: visitor.status,
+            checkInTime: visitor.checkInTime,
+            checkOutTime: visitor.checkOutTime,
+            purpose: visitor.purpose,
+            phone: visitor.phone,
+            idNumber: visitor.idNumber,
+          },
+        });
+      }
     }
 
     res.status(200).json({ success: true, message: `${visitor.name} checked in.` });
@@ -182,21 +195,24 @@ exports.checkOutVisitor = async (req, res) => {
     await visitor.save();
 
     const io = req.app.get('io');
-    if (io && visitor.tenantId) {
-      const room = `tenant_${visitor.tenantId.toString()}`;
-      io.to(room).emit('visitor-status-updated', {
-        type: 'checkout',
-        visitor: {
-          _id: visitor._id,
-          name: visitor.name,
-          status: visitor.status,
-          checkInTime: visitor.checkInTime,
-          checkOutTime: visitor.checkOutTime,
-          purpose: visitor.purpose,
-          phone: visitor.phone,
-          idNumber: visitor.idNumber,
-        },
-      });
+    if (io) {
+      io.emit('global-update');
+      if (visitor.tenantId) {
+        const room = `tenant_${visitor.tenantId.toString()}`;
+        io.to(room).emit('visitor-status-updated', {
+          type: 'checkout',
+          visitor: {
+            _id: visitor._id,
+            name: visitor.name,
+            status: visitor.status,
+            checkInTime: visitor.checkInTime,
+            checkOutTime: visitor.checkOutTime,
+            purpose: visitor.purpose,
+            phone: visitor.phone,
+            idNumber: visitor.idNumber,
+          },
+        });
+      }
     }
 
     res.status(200).json({ success: true, message: `${visitor.name} checked out.` });

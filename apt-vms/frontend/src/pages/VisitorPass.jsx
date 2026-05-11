@@ -54,7 +54,7 @@ const VisitorPass = () => {
         {/* QR Code Container */}
         <div className="p-8 flex flex-col items-center bg-white border-b-2 border-dashed border-slate-200 relative">
           {visitor.status === 'Expired' ? (
-            <div className="p-8 bg-red-50 border-4 border-red-200 rounded-2xl shadow-inner flex flex-col items-center justify-center w-[240px] h-[240px]">
+            <div className="p-8 bg-red-50 border-4 border-red-200 rounded-2xl shadow-inner flex flex-col items-center justify-center w-60 h-60">
               <span className="text-5xl mb-4">🚫</span>
               <span className="font-black text-red-600 uppercase tracking-widest text-xl">Expired</span>
               <span className="text-[10px] text-red-400 font-bold uppercase tracking-widest mt-2 text-center">Pass Invalid</span>

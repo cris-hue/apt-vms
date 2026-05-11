@@ -167,6 +167,9 @@ exports.approveUser = async (req, res) => {
       console.error('Approval email failed:', err);
     });
 
+    const io = req.app.get('io');
+    if (io) io.emit('global-update');
+
     res.status(200).json({ success: true, message: "User approved" });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -175,6 +178,10 @@ exports.approveUser = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   try {
     await User.findByIdAndDelete(req.params.id);
+    
+    const io = req.app.get('io');
+    if (io) io.emit('global-update');
+
     res.status(200).json({ success: true, message: "User deleted" });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -216,6 +223,9 @@ exports.registerUser = async (req, res) => {
     if (!isApproved) {
       sendAdminNotificationEmail(user).catch(err => console.error(err));
     }
+
+    const io = req.app.get('io');
+    if (io) io.emit('global-update');
 
     res.status(201).json({ success: true, data: user });
   } catch (error) {
