@@ -44,6 +44,57 @@ const sendApprovalEmail = async (user) => {
   });
 };
 
+const sendAdminNotificationEmail = async (newUser) => {
+  console.log(`\n=> [SYSTEM ALERTS] Checking if Admin Notification Email can be sent...`);
+
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log('\n--- 🔔 SIMULATED ADMIN ALERT EMAIL ---');
+    console.log(`Subject: New ${newUser.role} registration requires approval`);
+    console.log(`Message: ${newUser.name} (${newUser.email}) registered and needs Admin approval.`);
+    console.log('--------------------------------------\n');
+    return;
+  }
+
+  try {
+    const admins = await User.find({ role: 'admin' });
+    if (admins.length === 0) {
+      console.log('⚠️  [EMAIL ABORTED] No Administrators found in the database to notify!\n');
+      return;
+    }
+
+    const adminEmails = admins.map(admin => admin.email).join(',');
+    console.log(`=> [EMAIL PREP] Sending alert to ${admins.length} Admin(s): ${adminEmails}`);
+    const roleText = newUser.role;
+
+    const subject = `New ${roleText} registration requires approval`;
+    const html = `
+      <div style="font-family:system-ui, sans-serif; color:#1f2937;">
+        <h2 style="color:#0f172a;">New Registration Request</h2>
+        <p>A new user has registered as a <strong>${roleText}</strong> and is awaiting your approval.</p>
+        <div style="background-color:#f8fafc; padding:16px; border-radius:8px; margin:16px 0;">
+          <p style="margin:4px 0;"><strong>Name:</strong> ${newUser.name}</p>
+          <p style="margin:4px 0;"><strong>Email:</strong> ${newUser.email}</p>
+          <p style="margin:4px 0;"><strong>Phone:</strong> ${newUser.phone}</p>
+          ${newUser.role === 'tenant' ? `<p style="margin:4px 0;"><strong>Unit:</strong> ${newUser.unitNumber}</p>` : ''}
+        </div>
+        <p>Please log in to the admin dashboard to review and approve this request.</p>
+        <p style="margin-top:24px; color:#475569;">Thanks,<br/>SecureNest System</p>
+      </div>
+    `;
+
+    const transporter = createEmailTransporter();
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      to: adminEmails,
+      subject,
+      html,
+    });
+    console.log('✅ [EMAIL SUCCESS] Administrator(s) successfully notified!\n');
+  } catch (err) {
+    console.error('❌ [EMAIL ERROR] Failed to send the notification:', err.message, '\n');
+  }
+};
+
 // @desc    Login user
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
@@ -161,6 +212,11 @@ exports.registerUser = async (req, res) => {
 
     const isApproved = role === 'admin';
     const user = await User.create({ name, email, password, role, phone, unitNumber, isApproved });
+    
+    if (!isApproved) {
+      sendAdminNotificationEmail(user).catch(err => console.error(err));
+    }
+
     res.status(201).json({ success: true, data: user });
   } catch (error) {
     if (error.code === 11000) {

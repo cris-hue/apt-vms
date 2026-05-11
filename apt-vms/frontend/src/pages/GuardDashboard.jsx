@@ -4,7 +4,8 @@ import API from '../api/axios';
 import { 
   ShieldCheck, Search, UserCheck, Clock, 
   LogOut, X, Info, History, Activity, QrCode, 
-  CheckCircle2, Camera, CameraOff, ShieldAlert, Menu
+  CheckCircle2, Camera, CameraOff, ShieldAlert, Menu,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode'; 
 
@@ -12,6 +13,7 @@ const GuardDashboard = () => {
   const { user, logout } = useContext(AuthContext);
   const [visitors, setVisitors] = useState([]);
   const [activeFilter, setActiveFilter] = useState('Pending');
+  const [searchQuery, setSearchQuery] = useState('');
   const [vmsSearch, setVmsSearch] = useState('');
   const [scannedVisitor, setScannedVisitor] = useState(null);
   const [selectedVisitor, setSelectedVisitor] = useState(null); 
@@ -22,6 +24,12 @@ const GuardDashboard = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const scannerRef = useRef(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, searchQuery]);
 
   // 1. AUTO-CLEAR FEEDBACK
   useEffect(() => {
@@ -109,8 +117,18 @@ const GuardDashboard = () => {
     } catch (err) { alert("Check-out failed"); }
   };
 
-  const filteredList = visitors.filter(v => v.status === activeFilter);
+  const filteredList = visitors.filter(v => {
+    if (v.status !== activeFilter) return false;
+    if (activeFilter === 'Checked-In' && searchQuery.trim() !== '') {
+      return v.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    return true;
+  });
+  
+  const totalPages = Math.ceil(filteredList.length / itemsPerPage) || 1;
+  const currentList = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const formatDateTime = (t) => t ? new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '---';
+  const isOverdue = (v) => v.status === 'Checked-In' && v.checkInTime && (Date.now() - new Date(v.checkInTime).getTime() > 6 * 60 * 60 * 1000);
 
   return (
     /* RESPONSIVE LAYOUT: Sidebar hidden on mobile, shown on desktop */
@@ -142,6 +160,7 @@ const GuardDashboard = () => {
           <SidebarItem active={activeFilter === 'Pending'} onClick={() => { setActiveFilter('Pending'); setSidebarOpen(false); }} icon={<Clock size={18}/>} label="Expected Today" />
           <SidebarItem active={activeFilter === 'Checked-In'} onClick={() => { setActiveFilter('Checked-In'); setSidebarOpen(false); }} icon={<UserCheck size={18}/>} label="Currently Inside" />
           <SidebarItem active={activeFilter === 'Checked-Out'} onClick={() => { setActiveFilter('Checked-Out'); setSidebarOpen(false); }} icon={<History size={18}/>} label="Cleared History" />
+          <SidebarItem active={activeFilter === 'Expired'} onClick={() => { setActiveFilter('Expired'); setSidebarOpen(false); }} icon={<ShieldAlert size={18}/>} label="Expired Passes" />
         </nav>
 
         <div className="p-6 border-t border-slate-800 bg-slate-900/50">
@@ -176,32 +195,51 @@ const GuardDashboard = () => {
         </header>
 
         {/* STATS (Responsive Grid) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10 text-left">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-10 text-left">
           <StatBox icon={<Clock className="text-orange-500"/>} label="Expected" count={visitors.filter(v => v.status === 'Pending').length} color="orange" />
           <StatBox icon={<Activity className="text-blue-500"/>} label="Inside" count={visitors.filter(v => v.status === 'Checked-In').length} color="blue" />
-          <StatBox icon={<CheckCircle2 className="text-green-500"/>} label="Total Cleared" count={visitors.filter(v => v.status === 'Checked-Out').length} color="green" />
+          <StatBox icon={<CheckCircle2 className="text-green-500"/>} label="Cleared Passes" count={visitors.filter(v => v.status === 'Checked-Out').length} color="green" />
+          <StatBox icon={<ShieldAlert className="text-red-500"/>} label="Expired" count={visitors.filter(v => v.status === 'Expired').length} color="red" />
         </div>
 
         {/* REGISTRY LOGS */}
         <div className="flex-1 min-h-0 bg-white rounded-[4xl] md:rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden text-left flex flex-col">
-          <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
+          <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-50 flex flex-col md:flex-row justify-between md:items-center gap-4 bg-slate-50/30">
              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 italic">Registry Logs • {activeFilter}</h3>
-             <button onClick={fetchVisitors} className="p-2 md:p-3 text-slate-400 hover:text-blue-600 transition-all bg-white rounded-xl shadow-sm"><Activity size={18}/></button>
+             
+             <div className="flex items-center gap-3 w-full md:w-auto">
+               {activeFilter === 'Checked-In' && (
+                 <div className="relative flex-1 md:w-64">
+                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                   <input 
+                     type="text" 
+                     placeholder="SEARCH NAME..." 
+                     className="w-full bg-white border border-slate-200 py-2 md:py-2.5 pl-10 pr-4 rounded-xl text-xs font-bold uppercase tracking-widest outline-none focus:border-blue-600 transition-colors"
+                     value={searchQuery}
+                     onChange={(e) => setSearchQuery(e.target.value)}
+                   />
+                 </div>
+               )}
+               <button onClick={fetchVisitors} className="p-2 md:p-3 text-slate-400 hover:text-blue-600 transition-all bg-white rounded-xl shadow-sm flex-shrink-0"><Activity size={18}/></button>
+             </div>
           </div>
           <div className="divide-y divide-slate-50 overflow-y-auto flex-1 min-h-0">
-            {filteredList.map(v => (
-              <div key={v._id} className="px-6 md:px-10 py-6 md:py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 group hover:bg-blue-50/20 transition-all">
-                <div className="flex items-center gap-4 md:gap-6 text-left">
-                  <div className={`w-12 md:w-14 h-12 md:h-14 rounded-2xl flex items-center justify-center font-bold text-lg ${v.status === 'Checked-In' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-300'}`}>{v.name?.charAt(0)}</div>
-                  <div>
-                    <h4 className="font-bold text-slate-800 uppercase text-sm group-hover:text-blue-600 transition-colors">{v.name}</h4>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 italic">Unit {v.tenantId?.unitNumber} • Host: {v.tenantId?.name}</p>
+            {currentList.length === 0 ? (
+              <div className="p-12 text-center text-slate-300 font-bold uppercase text-[10px] tracking-widest italic">No records found</div>
+            ) : (
+              currentList.map(v => (
+              <div key={v._id} className="px-6 md:px-8 py-4 md:py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 group hover:bg-blue-50/20 transition-all">
+                <div className="flex items-center gap-4 md:gap-6 text-left min-w-0">
+                  <div className={`w-12 md:w-14 h-12 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-lg transition-colors ${v.status === 'Checked-In' ? (isOverdue(v) ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600') : v.status === 'Expired' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-400'} shrink-0`}>{v.name?.charAt(0)}</div>
+                  <div className="min-w-0 truncate">
+                    <h4 className="font-black text-slate-800 uppercase tracking-tight text-sm group-hover:text-blue-600 transition-colors truncate">{v.name}</h4>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 italic truncate">Unit {v.tenantId?.unitNumber} • Host: {v.tenantId?.name}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 md:gap-8 w-full md:w-auto">
                   <div className="text-right flex-1 md:flex-initial">
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic leading-none mb-1">Check Log</p>
-                    <p className="text-[10px] font-bold text-slate-800">{v.status === 'Pending' ? '---' : formatDateTime(v.checkInTime)}</p>
+                    <p className={`text-[10px] font-bold ${v.status === 'Checked-In' && isOverdue(v) ? 'text-red-600' : 'text-slate-800'}`}>{v.status === 'Pending' ? '---' : formatDateTime(v.checkInTime)}</p>
                   </div>
                   <div className="flex items-center gap-2 md:gap-3">
                     <button onClick={() => setSelectedVisitor(v)} className="p-2 md:p-3 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-xl transition-all shadow-sm"><Info size={18} /></button>
@@ -209,7 +247,27 @@ const GuardDashboard = () => {
                   </div>
                 </div>
               </div>
-            ))}
+              ))
+            )}
+          </div>
+          {/* Pagination Controls */}
+          <div className="border-t border-slate-100 p-4 bg-slate-50 flex flex-col sm:flex-row items-center justify-between flex-shrink-0 gap-4">
+             <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-slate-400">
+               Showing {filteredList.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredList.length)} of {filteredList.length} entries
+             </span>
+             <div className="flex items-center gap-2">
+               <button 
+                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                 disabled={currentPage === 1}
+                 className="p-2 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+               ><ChevronLeft size={16} /></button>
+               <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-slate-600 px-2">Page {currentPage} of {totalPages}</span>
+               <button 
+                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                 disabled={currentPage === totalPages}
+                 className="p-2 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+               ><ChevronRight size={16} /></button>
+             </div>
           </div>
         </div>
       </main>
@@ -238,24 +296,24 @@ const GuardDashboard = () => {
                     <div className={`flex-1 flex flex-col space-y-4 md:space-y-6 ${isScanning ? 'justify-between' : ''}`}>
                         <div className="space-y-4 md:space-y-6">
                             <div className="relative group">
-                                <Search className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-600 transition-colors" size={22} />
+                                <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-600 transition-colors" size={18} />
                                 <input 
                                     type="text" 
                                     placeholder="ENTER PASS CODE..." 
-                                    className="w-full bg-slate-50 border-2 border-slate-100 p-4 md:p-6 pl-12 md:pl-16 rounded-[2.5rem] outline-none focus:bg-white focus:border-blue-600/20 transition-all text-sm font-bold uppercase tracking-widest placeholder:text-slate-300"
+                                    className="w-full bg-slate-50 border-2 border-slate-100 py-3 md:py-4 pl-10 md:pl-12 pr-4 rounded-2xl outline-none focus:bg-white focus:border-blue-600/20 transition-all text-xs md:text-sm font-bold uppercase tracking-widest placeholder:text-slate-300"
                                     value={vmsSearch}
                                     onChange={(e) => setVmsSearch(e.target.value)}
                                 />
                             </div>
                             
-                            <div className="flex flex-col md:flex-row gap-3 md:gap-4">
+                            <div className="flex flex-col sm:flex-row gap-3">
                                 <button 
                                     onClick={isScanning ? stopScanner : startScanner}
-                                    className={`flex-1 flex items-center justify-center gap-3 p-4 md:p-6 rounded-[4xl] font-bold uppercase text-[10px] tracking-widest shadow-lg transition-all ${isScanning ? 'bg-red-500 text-white' : 'bg-slate-900 text-white hover:bg-blue-600'}`}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-3 md:py-4 px-4 rounded-2xl font-bold uppercase text-[10px] tracking-widest shadow-md transition-all ${isScanning ? 'bg-red-500 text-white' : 'bg-slate-900 text-white hover:bg-blue-600'}`}
                                 >
-                                    {isScanning ? <><CameraOff size={20}/> Stop Camera</> : <><Camera size={20}/> Launch Scanner</>}
+                                    {isScanning ? <><CameraOff size={18}/> Stop Camera</> : <><Camera size={18}/> Launch Scanner</>}
                                 </button>
-                                <button onClick={() => processVerification()} className="bg-blue-600 text-white px-6 md:px-10 py-4 md:py-6 rounded-[4xl] font-bold uppercase text-[10px] tracking-widest hover:bg-blue-700 shadow-lg active:scale-95 transition-all whitespace-nowrap">Verify Manual</button>
+                                <button onClick={() => processVerification()} className="bg-blue-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-blue-700 shadow-md active:scale-95 transition-all whitespace-nowrap">Verify Manual</button>
                             </div>
                         </div>
 
@@ -285,9 +343,14 @@ const GuardDashboard = () => {
                                 <DetailField label="ID Reference" value={scannedVisitor.idNumber} />
                                 <DetailField label="Host Unit" value={`Unit ${scannedVisitor.tenantId?.unitNumber}`} />
                                 <DetailField label="Resident Name" value={scannedVisitor.tenantId?.name} />
+                                <DetailField label="Purpose" value={scannedVisitor.purpose} />
                             </div>
                             {scannedVisitor.status === 'Pending' ? (
                                 <button onClick={() => handleCheckIn(scannedVisitor._id)} className="w-full bg-green-600 hover:bg-green-700 text-white py-4 md:py-6 rounded-[4xl] font-bold uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all"><CheckCircle2 size={20}/> Authorize Entry</button>
+                            ) : scannedVisitor.status === 'Expired' ? (
+                                <div className="p-4 md:p-6 bg-red-50 border border-red-100 rounded-[4xl] text-center">
+                                    <p className="text-[10px] font-extrabold text-red-500 uppercase tracking-[0.2em] italic">Pass Expired</p>
+                                </div>
                             ) : (
                                 <div className="p-4 md:p-6 bg-white border border-slate-200 rounded-[4xl] text-center">
                                     <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.2em] italic">Session Completed</p>
@@ -317,6 +380,7 @@ const GuardDashboard = () => {
             </div>
             <div className="space-y-4 md:space-y-6 bg-slate-50 p-6 md:p-8 rounded-4xl md:rounded-[3rem] border border-slate-100">
               <DetailField label="ID Number" value={selectedVisitor.idNumber} />
+              <DetailField label="Purpose" value={selectedVisitor.purpose} />
               <DetailField label="Apartment" value={`Unit ${selectedVisitor.tenantId?.unitNumber} (${selectedVisitor.tenantId?.name})`} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 md:pt-6 border-t border-slate-200">
                 <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic leading-none text-left">Arrival: <span className="text-slate-800 font-bold block mt-1.5 normal-case">{formatDateTime(selectedVisitor.checkInTime)}</span></div>
@@ -336,9 +400,12 @@ const SidebarItem = ({ active, onClick, icon, label }) => (
 );
 
 const StatBox = ({ icon, label, count, color }) => (
-  <div className="bg-white p-7 rounded-[3rem] border border-slate-100 shadow-sm flex items-center gap-6">
-    <div className={`p-5 rounded-2xl bg-${color}-50`}>{icon}</div>
-    <div className="text-left"><p className="text-3xl font-extrabold text-slate-900 leading-none">{count}</p><p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-2 leading-none italic">{label}</p></div>
+  <div className={`bg-white p-4 md:p-5 rounded-3xl border flex items-center gap-3 md:gap-4 min-w-0 transition-all ${color === 'red' && count > 0 ? 'border-red-300 shadow-lg shadow-red-200 animate-pulse' : 'border-slate-200 shadow-sm'}`}>
+    <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl bg-${color}-50 shrink-0`}>{icon}</div>
+    <div className="min-w-0 flex-1 text-left">
+      <p className="text-xl md:text-2xl font-black text-slate-900 leading-none truncate">{count}</p>
+      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 md:mt-1.5 italic leading-tight break-words">{label}</p>
+    </div>
   </div>
 );
 

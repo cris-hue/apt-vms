@@ -1,6 +1,25 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 
 const LandingPage = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined' && userStr !== 'null') {
+        const user = JSON.parse(userStr);
+        if (user && Object.keys(user).length > 0) {
+          if (user.role === 'admin') navigate('/admin');
+          else if (user.role === 'guard') navigate('/guard-dashboard');
+          else navigate('/tenant-dashboard');
+        }
+      }
+    } catch (error) {
+      localStorage.removeItem('user');
+    }
+  }, [navigate]);
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <header className="mx-auto max-w-7xl px-6 py-8 flex items-center justify-between">

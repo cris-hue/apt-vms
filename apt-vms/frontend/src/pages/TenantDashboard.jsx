@@ -5,8 +5,10 @@ import { io } from 'socket.io-client';
 import { 
   ShieldCheck, History, User, LogOut, LayoutDashboard, 
   Settings, Activity, Plus, Save, Mail, CheckCircle2, 
-  Clock, Trash2, Edit3, X, Eye, Phone, Share2, Menu, Download
+  Clock, Trash2, Edit3, X, Eye, Phone, Share2, Menu, Download, Bell, Search,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react'; 
 import InviteModal from '../components/InviteModal';
 
@@ -16,11 +18,21 @@ const TenantDashboard = () => {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [viewingPass, setViewingPass] = useState(null); 
   const [editingPass, setEditingPass] = useState(null);
   const [profileForm, setProfileForm] = useState({ phone: '' });
   const qrCanvasRef = useRef(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [logFilter, setLogFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState('newest');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeView, logFilter, searchQuery, sortOrder]);
 
   useEffect(() => {
     if (user) {
@@ -41,7 +53,7 @@ const TenantDashboard = () => {
     });
 
     socket.on('visitor-status-updated', (payload) => {
-      setNotifications((prev) => [{ id: Date.now(), ...payload }, ...prev].slice(0, 3));
+      setNotifications((prev) => [{ id: Date.now(), ...payload }, ...prev].slice(0, 20));
       fetchHistory();
     });
 
@@ -115,6 +127,25 @@ Use this link: ${passUrl}`;
     link.click();
   };
 
+  const isOverdue = (v) => v.status === 'Checked-In' && v.checkInTime && (Date.now() - new Date(v.checkInTime).getTime() > 6 * 60 * 60 * 1000);
+
+  const filteredHistory = history.filter(v => {
+    if (activeView === 'active' && v.status !== 'Pending') return false;
+    if (activeView === 'history' && logFilter !== 'all' && v.status !== logFilter) return false;
+    if (searchQuery.trim() !== '') {
+      const nameStr = v.name ? String(v.name).toLowerCase() : '';
+      if (!nameStr.includes(searchQuery.toLowerCase())) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    const dateA = new Date(a.createdAt || 0).getTime();
+    const dateB = new Date(b.createdAt || 0).getTime();
+    return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+  });
+
+  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage) || 1;
+  const currentHistoryData = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans text-slate-900">
       <aside className={`w-full md:w-80 bg-slate-900 text-slate-300 flex flex-col ${sidebarOpen ? 'fixed inset-0 z-100 md:sticky md:inset-auto md:z-0' : 'hidden md:flex'} md:top-0 md:h-screen shadow-2xl transition-all`}>
@@ -133,7 +164,7 @@ Use this link: ${passUrl}`;
         </nav>
         <div className="p-6 border-t border-slate-800 bg-slate-900/50">
           <div className="flex items-center gap-4 mb-6 px-2">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black">{user?.name?.charAt(0).toUpperCase()}</div>
+            <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black">{user?.name?.charAt(0)?.toUpperCase() || 'T'}</div>
             <div className="overflow-hidden">
               <p className="text-sm font-black text-white truncate uppercase">{user?.name}</p>
               <p className="text-[10px] text-slate-500 font-bold truncate lowercase flex items-center gap-1"><Mail size={10} /> {user?.email}</p>
@@ -147,47 +178,64 @@ Use this link: ${passUrl}`;
       </aside>
 
       <main className="flex-1 p-6 md:p-12 h-[100dvh] flex flex-col overflow-hidden w-full">
-        <header className="relative flex flex-col md:flex-row justify-between items-start md:items-center mb-10 text-left gap-4 pr-16 flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 text-slate-900 rounded-lg hover:bg-slate-200 transition-colors"><Menu size={20} /></button>
+        <header className="flex justify-between items-center gap-4 mb-8 md:mb-10 flex-shrink-0">
+          <div className="flex items-center gap-3 md:gap-4">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-2 text-slate-900 rounded-lg hover:bg-slate-200 transition-colors"><Menu size={24} /></button>
             <div>
-              <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">{activeView.replace('dashboard', 'Overview').replace('active', 'Active Passes').replace('history', 'Pass History').replace('profile', 'My Profile')}</h2>
-              <p className="text-slate-400 font-black mt-1 uppercase text-[10px] tracking-widest italic leading-none text-left">Residential Access Management</p>
+              <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">{activeView.replace('dashboard', 'Overview').replace('active', 'Active Passes').replace('history', 'Pass History').replace('profile', 'My Profile')}</h2>
+              <p className="text-slate-400 font-black mt-1.5 uppercase text-[10px] tracking-widest italic leading-none text-left">Residential Access Management</p>
             </div>
           </div>
-          <div className="absolute right-0 top-0 flex items-center gap-4">
-            <button onClick={() => setIsInviteOpen(true)} className="hidden sm:inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-200"><Plus size={18} /> Invite Visitor</button>
-            <div className="w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-black uppercase shadow-lg">{user?.name?.charAt(0) || 'T'}</div>
+          <div className="flex items-center gap-2 md:gap-4">
+            <button onClick={() => setIsInviteOpen(true)} className="flex items-center gap-1 md:gap-2 bg-blue-600 text-white px-3 md:px-6 py-2 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest shadow-xl shadow-blue-200">
+              <Plus size={16} className="md:hidden" />
+              <Plus size={18} className="hidden md:block" />
+              <span className="hidden sm:inline">Invite Visitor</span>
+              <span className="sm:hidden">Invite</span>
+            </button>
+
+            <div className="relative">
+              <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative p-2 md:p-3 bg-white text-slate-400 hover:text-slate-900 border border-slate-200 rounded-xl shadow-sm transition-all active:scale-95">
+                <Bell size={20} />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white"></span>
+                )}
+              </button>
+
+              {isNotificationsOpen && (
+                <div className="absolute top-full right-[-44px] md:right-0 mt-2 w-[85vw] sm:w-80 max-w-sm bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden text-left animate-in slide-in-from-top-2">
+                  <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Notifications</h4>
+                    {notifications.length > 0 && (
+                      <button onClick={() => setNotifications([])} className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 transition-colors">Clear All</button>
+                    )}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest italic">No new alerts</div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <div key={notification.id} className="p-4 hover:bg-slate-50 transition-colors">
+                          <p className="font-bold text-xs text-slate-800 uppercase tracking-tight leading-snug">{notification.visitor.name} has {notification.type === 'checkin' ? 'checked in' : 'checked out'}.</p>
+                          <p className="text-[9px] text-slate-400 mt-1 font-bold uppercase tracking-widest">{new Date(notification.type === 'checkin' ? notification.visitor.checkInTime : notification.visitor.checkOutTime).toLocaleString()}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs md:text-sm font-black uppercase shadow-lg">{user?.name?.charAt(0) || 'T'}</div>
           </div>
         </header>
 
-        {notifications.length > 0 && (
-          <div className="space-y-3 mb-6">
-            {notifications.map((notification) => (
-              <div key={notification.id} className="rounded-4xl border border-slate-200 bg-slate-950/95 text-white p-4 shadow-xl">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-400">Real-time alert</p>
-                    <p className="font-black text-sm uppercase tracking-tight text-white">{notification.visitor.name} has {notification.type === 'checkin' ? 'checked in' : 'checked out'}.</p>
-                    <p className="text-[10px] text-slate-400 mt-1">{new Date(notification.type === 'checkin' ? notification.visitor.checkInTime : notification.visitor.checkOutTime).toLocaleString()}</p>
-                  </div>
-                  <button
-                    onClick={() => setNotifications((prev) => prev.filter((item) => item.id !== notification.id))}
-                    className="p-2 rounded-full bg-slate-800/80 hover:bg-slate-700 transition-colors"
-                    aria-label="Dismiss notification"
-                  ><X size={16} /></button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {activeView === 'dashboard' && (
           <div className="animate-in fade-in duration-500 flex flex-col flex-1 min-h-0 pb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 text-left flex-shrink-0">
-              <StatBox icon={<Activity className="text-blue-500"/>} label="Visits this Month" count={history.filter(v => v.status !== 'Pending').length} color="blue" />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10 text-left flex-shrink-0">
+              <StatBox icon={<Activity className="text-blue-500"/>} label="Completed Visits" count={history.filter(v => v.status === 'Checked-Out').length} color="blue" />
               <StatBox icon={<CheckCircle2 className="text-green-500"/>} label="Currently Inside" count={history.filter(v => v.status === 'Checked-In').length} color="green" />
               <StatBox icon={<Clock className="text-orange-500"/>} label="Pending Invites" count={history.filter(v => v.status === 'Pending').length} color="orange" />
+              <StatBox icon={<ShieldAlert className="text-red-500"/>} label="Expired Passes" count={history.filter(v => v.status === 'Expired').length} color="red" />
             </div>
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden text-left">
                <div className="px-10 py-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center flex-shrink-0">
@@ -195,7 +243,7 @@ Use this link: ${passUrl}`;
                   <button onClick={() => setActiveView('active')} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Manage All</button>
                </div>
                <div className="divide-y divide-slate-50 flex-1 overflow-y-auto min-h-0">
-                  {history.map(v => <VisitorRow key={v._id} visitor={v} />)}
+                  {history.slice(0, 5).map(v => <VisitorRow key={v._id} visitor={v} />)}
                </div>
             </div>
           </div>
@@ -206,7 +254,7 @@ Use this link: ${passUrl}`;
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="md:col-span-1">
                 <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 text-center shadow-sm">
-                  <div className="w-24 h-24 rounded-3xl bg-blue-600 mx-auto mb-4 flex items-center justify-center text-white text-3xl font-black">{user?.name?.charAt(0).toUpperCase()}</div>
+                  <div className="w-24 h-24 rounded-3xl bg-blue-600 mx-auto mb-4 flex items-center justify-center text-white text-3xl font-black">{user?.name?.charAt(0)?.toUpperCase() || 'T'}</div>
                   <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{user?.name}</h3>
                   <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1 italic">Resident Tenant</p>
                   <div className="mt-8 pt-6 border-t border-slate-50 flex flex-col gap-3">
@@ -236,19 +284,55 @@ Use this link: ${passUrl}`;
 
         {(activeView === 'active' || activeView === 'history') && (
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden animate-in slide-in-from-bottom-4 duration-300 text-left">
-            <div className="px-10 py-8 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center text-left flex-shrink-0">
-               <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 italic">
-                 {activeView === 'active' ? 'Pending Invitations' : 'Complete Visitor Registry'}
-               </h3>
+            <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-50 bg-slate-50/50 flex flex-col text-left flex-shrink-0 gap-4 md:gap-5">
+               <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                 <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 italic whitespace-nowrap">
+                   {activeView === 'active' ? 'Pending Invitations' : 'Complete Visitor Registry'}
+                 </h3>
+                 {activeView === 'history' && (
+                   <div className="flex flex-wrap gap-2">
+                      <button onClick={() => setLogFilter('all')} className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${logFilter === 'all' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>All</button>
+                      <button onClick={() => setLogFilter('Pending')} className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${logFilter === 'Pending' ? 'bg-orange-500 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Expected</button>
+                      <button onClick={() => setLogFilter('Checked-In')} className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${logFilter === 'Checked-In' ? 'bg-green-500 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Inside</button>
+                      <button onClick={() => setLogFilter('Checked-Out')} className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${logFilter === 'Checked-Out' ? 'bg-green-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Checked Out</button>
+                      <button onClick={() => setLogFilter('Expired')} className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${logFilter === 'Expired' ? 'bg-red-500 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Expired</button>
+                   </div>
+                 )}
+               </div>
+               <div className="flex flex-col sm:flex-row w-full gap-2 md:gap-3">
+                 <div className="relative w-full sm:max-w-md">
+                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                   <input 
+                     type="text" 
+                     placeholder="SEARCH NAME..." 
+                     className="w-full bg-white border border-slate-200 py-2.5 pl-10 pr-4 rounded-xl text-xs font-bold uppercase tracking-widest outline-none focus:border-blue-600 transition-colors shadow-sm"
+                     value={searchQuery}
+                     onChange={(e) => setSearchQuery(e.target.value)}
+                   />
+                 </div>
+                 {activeView === 'history' && (
+                   <select
+                     value={sortOrder}
+                     onChange={(e) => setSortOrder(e.target.value)}
+                     className="bg-white border border-slate-200 py-2.5 px-3 md:px-4 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest outline-none focus:border-blue-600 transition-colors shadow-sm text-slate-500 cursor-pointer appearance-none text-center"
+                   >
+                     <option value="newest">Newest First</option>
+                     <option value="oldest">Oldest First</option>
+                   </select>
+                 )}
+               </div>
             </div>
             <div className="divide-y divide-slate-50 flex-1 overflow-y-auto min-h-0">
-              {history.filter(v => activeView === 'active' ? v.status === 'Pending' : v.status !== 'Pending').map(v => (
-                <div key={v._id} className="px-10 py-7 flex items-center justify-between group hover:bg-blue-50/20 transition-all text-left">
-                  <div className="flex items-center gap-6">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-lg ${v.status === 'Checked-In' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-400'}`}>{v.name[0]}</div>
-                    <div>
-                      <h4 className="font-black text-slate-800 uppercase text-sm group-hover:text-blue-600">{v.name}</h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 italic">{v.purpose} • {new Date(v.createdAt).toLocaleDateString()}</p>
+              {currentHistoryData.length === 0 ? (
+                <div className="p-12 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">No records found</div>
+              ) : (
+                currentHistoryData.map(v => (
+                <div key={v._id} className="px-6 md:px-8 py-4 md:py-5 flex items-center justify-between group hover:bg-blue-50/20 transition-all text-left">
+                  <div className="flex items-center gap-4 md:gap-6 min-w-0 pr-2">
+                    <div className={`w-12 md:w-14 h-12 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-lg transition-colors ${v.status === 'Checked-In' ? (isOverdue(v) ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600') : v.status === 'Expired' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-400'} shrink-0`}>{v.name ? String(v.name).charAt(0).toUpperCase() : 'V'}</div>
+                    <div className="min-w-0 truncate">
+                      <h4 className="font-black text-slate-800 uppercase tracking-tight text-sm group-hover:text-blue-600 transition-colors truncate">{v.name || 'Unknown'}</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 italic truncate">{v.purpose || 'N/A'} • {v.createdAt ? new Date(v.createdAt).toLocaleDateString() : 'N/A'}</p>
                     </div>
                   </div>
                   {v.status === 'Pending' ? (
@@ -258,10 +342,30 @@ Use this link: ${passUrl}`;
                       <button onClick={() => handleRevoke(v._id)} className="p-3 bg-red-50 text-red-500 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
                     </div>
                   ) : (
-                    <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${v.status === 'Checked-In' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-slate-50 text-slate-300 border-slate-100'}`}>{v.status}</span>
+                    <span className={`px-3 md:px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest whitespace-nowrap border ${v.status === 'Checked-In' ? (isOverdue(v) ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100') : v.status === 'Expired' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-50 text-slate-300 border-slate-100'}`}>{v.status}</span>
                   )}
                 </div>
-              ))}
+                ))
+              )}
+            </div>
+            {/* Pagination Controls */}
+            <div className="border-t border-slate-100 p-4 bg-slate-50 flex flex-col sm:flex-row items-center justify-between flex-shrink-0 gap-4">
+              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Showing {filteredHistory.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredHistory.length)} of {filteredHistory.length} entries
+              </span>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                ><ChevronLeft size={16} /></button>
+                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-600 px-2">Page {currentPage} of {totalPages}</span>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                ><ChevronRight size={16} /></button>
+              </div>
             </div>
           </div>
         )}
@@ -331,20 +435,29 @@ const EditInput = ({ label, value, onChange }) => (
 );
 
 const StatBox = ({ icon, label, count, color }) => (
-  <div className="bg-white p-7 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-6">
-    <div className={`p-5 rounded-2xl bg-${color}-50`}>{icon}</div>
-    <div><p className="text-3xl font-black text-slate-900 leading-none">{count}</p><p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2 italic">{label}</p></div>
+  <div className={`bg-white p-4 md:p-5 rounded-3xl border flex items-center gap-3 md:gap-4 min-w-0 transition-all ${color === 'red' && count > 0 ? 'border-red-300 shadow-lg shadow-red-200 animate-pulse' : 'border-slate-200 shadow-sm'}`}>
+    <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl bg-${color}-50 shrink-0`}>{icon}</div>
+    <div className="min-w-0 flex-1">
+      <p className="text-xl md:text-2xl font-black text-slate-900 leading-none truncate">{count}</p>
+      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 md:mt-1.5 italic leading-tight break-words">{label}</p>
+    </div>
   </div>
 );
 
-const VisitorRow = ({ visitor }) => (
-  <div className="px-10 py-7 flex items-center justify-between group hover:bg-blue-50/20 transition-all text-left">
-    <div className="flex items-center gap-6">
-      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-lg transition-all ${visitor.status === 'Checked-In' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-300'}`}>{visitor.name.charAt(0)}</div>
-      <div><h4 className="font-black text-slate-800 uppercase text-sm group-hover:text-blue-600 transition-colors">{visitor.name}</h4><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 italic">{visitor.purpose} • {new Date(visitor.createdAt).toLocaleDateString()}</p></div>
+const VisitorRow = ({ visitor }) => {
+  const isOverdue = visitor.status === 'Checked-In' && visitor.checkInTime && (Date.now() - new Date(visitor.checkInTime).getTime() > 6 * 60 * 60 * 1000);
+  return (
+    <div className="px-6 md:px-8 py-4 md:py-5 flex items-center justify-between group hover:bg-blue-50/20 transition-all text-left">
+      <div className="flex items-center gap-4 md:gap-6 min-w-0 pr-2">
+        <div className={`w-12 md:w-14 h-12 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-lg transition-colors ${visitor.status === 'Checked-In' ? (isOverdue ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600') : visitor.status === 'Expired' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-400'} shrink-0`}>{visitor.name ? String(visitor.name).charAt(0).toUpperCase() : 'V'}</div>
+        <div className="min-w-0 truncate">
+          <h4 className="font-black text-slate-800 uppercase tracking-tight text-sm group-hover:text-blue-600 transition-colors truncate">{visitor.name || 'Unknown'}</h4>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 italic truncate">{visitor.purpose || 'N/A'} • {visitor.createdAt ? new Date(visitor.createdAt).toLocaleDateString() : 'N/A'}</p>
+        </div>
+      </div>
+      <span className={`px-3 md:px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest whitespace-nowrap border ${visitor.status === 'Checked-In' ? (isOverdue ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100') : visitor.status === 'Expired' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-100 text-slate-300 border-slate-200'}`}>{visitor.status}</span>
     </div>
-    <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${visitor.status === 'Checked-In' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-slate-100 text-slate-300 border-slate-200'}`}>{visitor.status}</span>
-  </div>
-);
+  );
+};
 
 export default TenantDashboard;

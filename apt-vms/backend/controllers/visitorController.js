@@ -2,6 +2,38 @@ const Visitor = require('../models/Visitor');
 const QRCode = require('qrcode');
 const mongoose = require('mongoose');
 
+// Helper function to auto-expire passes that passed 10:00 PM
+const autoExpirePasses = async () => {
+  try {
+    const pendingVisitors = await Visitor.find({ status: 'Pending' });
+    if (!pendingVisitors.length) return;
+
+    const now = new Date();
+    const expiredIds = [];
+
+    pendingVisitors.forEach(v => {
+      const createdAt = new Date(v.createdAt || v._id.getTimestamp());
+      let expirationTime = new Date(createdAt);
+      expirationTime.setHours(22, 0, 0, 0); // 10:00 PM
+      
+      // If created after 10 PM, it expires at 10 PM the next day
+      if (createdAt.getHours() >= 22) {
+        expirationTime.setDate(expirationTime.getDate() + 1);
+      }
+
+      if (now > expirationTime) {
+        expiredIds.push(v._id);
+      }
+    });
+
+    if (expiredIds.length > 0) {
+      await Visitor.updateMany({ _id: { $in: expiredIds } }, { $set: { status: 'Expired' } });
+    }
+  } catch (err) {
+    console.error("Error auto-expiring passes:", err);
+  }
+};
+
 // @desc    Register a new visitor (Tenant Action)
 exports.registerVisitor = async (req, res) => {
   try {
@@ -24,6 +56,7 @@ exports.registerVisitor = async (req, res) => {
 // @desc    Get only the visitors belonging to the logged-in tenant
 exports.getMyVisitors = async (req, res) => {
   try {
+    await autoExpirePasses();
     const userId = new mongoose.Types.ObjectId(req.user._id || req.user.id);
     const visitors = await Visitor.find({ tenantId: userId }).sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: visitors });
@@ -78,7 +111,12 @@ exports.deleteVisitor = async (req, res) => {
 // @desc    Get all visitors (Admin/Guard Action)
 exports.getAllVisitors = async (req, res) => {
   try {
-    const visitors = await Visitor.find().populate('tenantId', 'name unitNumber').sort({ createdAt: -1 });
+    await autoExpirePasses();
+    const visitors = await Visitor.find()
+      .populate('tenantId', 'name unitNumber')
+      .populate('checkedInBy', 'name role')
+      .populate('checkedOutBy', 'name role')
+      .sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: visitors });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -88,6 +126,7 @@ exports.getAllVisitors = async (req, res) => {
 // @desc    Find visitor by QR string
 exports.getVisitorByQR = async (req, res) => {
   try {
+    await autoExpirePasses();
     const visitor = await Visitor.findOne({ qrCode: req.params.qrCode }).populate('tenantId', 'name unitNumber');
     if (!visitor) return res.status(404).json({ message: 'Invalid QR Code' });
     res.status(200).json({ success: true, data: visitor });
@@ -101,6 +140,8 @@ exports.checkInVisitor = async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
     if (!visitor) return res.status(404).json({ message: 'Visitor not found' });
+    if (visitor.status === 'Expired') return res.status(400).json({ message: 'This pass has expired.' });
+    if (visitor.status !== 'Pending') return res.status(400).json({ message: 'Visitor is already checked in or pass is invalid.' });
     visitor.status = 'Checked-In';
     visitor.checkInTime = Date.now();
     visitor.checkedInBy = req.user._id;

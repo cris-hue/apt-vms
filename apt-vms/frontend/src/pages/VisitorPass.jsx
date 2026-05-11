@@ -53,9 +53,17 @@ const VisitorPass = () => {
 
         {/* QR Code Container */}
         <div className="p-8 flex flex-col items-center bg-white border-b-2 border-dashed border-slate-200 relative">
-          <div className="p-4 bg-white border-4 border-slate-800 rounded-2xl shadow-inner">
-            <QRCodeCanvas value={visitor.qrCode} size={200} />
-          </div>
+          {visitor.status === 'Expired' ? (
+            <div className="p-8 bg-red-50 border-4 border-red-200 rounded-2xl shadow-inner flex flex-col items-center justify-center w-[240px] h-[240px]">
+              <span className="text-5xl mb-4">🚫</span>
+              <span className="font-black text-red-600 uppercase tracking-widest text-xl">Expired</span>
+              <span className="text-[10px] text-red-400 font-bold uppercase tracking-widest mt-2 text-center">Pass Invalid</span>
+            </div>
+          ) : (
+            <div className="p-4 bg-white border-4 border-slate-800 rounded-2xl shadow-inner flex items-center justify-center">
+              <QRCodeCanvas value={visitor.qrCode} size={200} />
+            </div>
+          )}
           {/* Decorative punch holes for the "ticket" look */}
           <div className="absolute -left-4 -bottom-4 w-8 h-8 bg-blue-600 rounded-full shadow-inner"></div>
           <div className="absolute -right-4 -bottom-4 w-8 h-8 bg-blue-600 rounded-full shadow-inner"></div>
@@ -83,7 +91,7 @@ const VisitorPass = () => {
               <div className="p-2 bg-slate-50 rounded-lg text-slate-600 border border-slate-100"><Clock size={20} /></div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
-                <p className="text-sm font-bold text-green-600">{visitor.status}</p>
+                <p className={`text-sm font-bold ${visitor.status === 'Expired' ? 'text-red-600' : 'text-green-600'}`}>{visitor.status}</p>
               </div>
             </div>
           </div>

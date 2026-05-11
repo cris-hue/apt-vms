@@ -1,7 +1,7 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { LogIn, ShieldCheck } from 'lucide-react';
-import { Link } from 'react-router-dom'; // <--- Added this import
+import { Link, useNavigate } from 'react-router-dom';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -9,6 +9,23 @@ const Login = () => {
   const { login } = useContext(AuthContext);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined' && userStr !== 'null') {
+        const user = JSON.parse(userStr);
+        if (user && Object.keys(user).length > 0) {
+          if (user.role === 'admin') navigate('/admin');
+          else if (user.role === 'guard') navigate('/guard-dashboard');
+          else navigate('/tenant-dashboard');
+        }
+      }
+    } catch (error) {
+      localStorage.removeItem('user');
+    }
+  }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,9 +75,11 @@ const Login = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              Password
-            </label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-semibold text-slate-700">
+                Password
+              </label>
+            </div>
             <input 
               type="password" 
               placeholder="••••••••"

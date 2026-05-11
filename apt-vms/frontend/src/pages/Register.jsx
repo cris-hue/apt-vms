@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import API from '../api/axios';
 import { UserPlus, ShieldCheck, Lock, Mail, User, Phone, Home, Loader2 } from 'lucide-react';
 
@@ -11,6 +11,23 @@ const Register = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [takenUnits, setTakenUnits] = useState([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined' && userStr !== 'null') {
+        const user = JSON.parse(userStr);
+        if (user && Object.keys(user).length > 0) {
+          if (user.role === 'admin') navigate('/admin');
+          else if (user.role === 'guard') navigate('/guard-dashboard');
+          else navigate('/tenant-dashboard');
+        }
+      }
+    } catch (error) {
+      localStorage.removeItem('user');
+    }
+  }, [navigate]);
 
   const unitOptions = Array.from({ length: 100 }, (_, i) => `A${(i + 1).toString().padStart(3, '0')}`);
 

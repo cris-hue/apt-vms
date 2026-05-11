@@ -29,6 +29,6 @@ router.delete('/:id', protect, authorize('tenant'), deleteVisitor);
 router.get('/all', protect, authorize('guard', 'admin'), getAllVisitors);
 router.get('/scan/:qrCode', protect, authorize('guard'), getVisitorByQR);
 router.put('/checkin/:id', protect, authorize('guard'), checkInVisitor);
-router.put('/checkout/:id', protect, authorize('guard'), checkOutVisitor);
+router.put('/checkout/:id', protect, authorize('guard', 'admin'), checkOutVisitor);
 
 module.exports = router;

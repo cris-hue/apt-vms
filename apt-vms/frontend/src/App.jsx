@@ -9,13 +9,24 @@ import GuardDashboard from './pages/GuardDashboard';
 import VisitorPass from './pages/VisitorPass';
 
 function App() {
+  // Safely parse localStorage to prevent fatal JSON syntax crashes
+  const safelyGetUser = () => {
+    try {
+      const item = localStorage.getItem('user');
+      return item && item !== 'undefined' && item !== 'null' ? JSON.parse(item) : null;
+    } catch (e) {
+      localStorage.removeItem('user');
+      return null;
+    }
+  };
+
   // 2. Retrieve user data from localStorage to pass to dashboards
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
+  const [user, setUser] = useState(safelyGetUser());
 
   // Listen for changes in localStorage (login/logout)
   useEffect(() => {
     const handleStorageChange = () => {
-      setUser(JSON.parse(localStorage.getItem('user')));
+      setUser(safelyGetUser());
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);

@@ -10,10 +10,18 @@ export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    if (storedUser && token) {
-      setUser(JSON.parse(storedUser));
+    try {
+      const storedUser = localStorage.getItem('user');
+      const token = localStorage.getItem('token');
+      if (storedUser && storedUser !== 'undefined' && storedUser !== 'null' && token) {
+        setUser(JSON.parse(storedUser));
+      } else {
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
+    } catch (e) {
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
     }
     setLoading(false);
   }, []);
@@ -36,7 +44,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.clear();
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
     setUser(null);
     navigate('/login');
   };

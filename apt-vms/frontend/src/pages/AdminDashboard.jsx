@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import API from '../api/axios';
 import { 
-  Users, AlertCircle, RefreshCw, LogOut, ShieldCheck, 
+  Users, AlertCircle, RefreshCw, LogOut, ShieldCheck, ChevronLeft,
   ClipboardList, UserPlus, Building2, ChevronRight, X, Info, Mail, Trash2, Clock, CheckCircle2, Menu, Download
 } from 'lucide-react';
+import { Search } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { user: currentUser, logout } = useContext(AuthContext);
@@ -13,7 +15,7 @@ const AdminDashboard = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState({ pending: 0, tenants: 0, guards: 0 });
+  const [stats, setStats] = useState({ pending: 0, tenants: 0, guards: 0, inside: 0, expired: 0 });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportStartDate, setReportStartDate] = useState('');
@@ -22,19 +24,26 @@ const AdminDashboard = () => {
   const [selectedLog, setSelectedLog] = useState(null); 
   const [selectedUser, setSelectedUser] = useState(null);
   const [logFilter, setLogFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const navigate = useNavigate();
 
   const fetchStats = async () => {
     try {
-      const [approvedRes, pendingRes] = await Promise.all([
+      const [approvedRes, pendingRes, visitorsRes] = await Promise.all([
         API.get('/auth/approved'),
-        API.get('/auth/pending')
+        API.get('/auth/pending'),
+        API.get('/visitors/all')
       ]);
       const approved = approvedRes.data.data || [];
+      const visitors = visitorsRes.data.data || [];
       setStats({
         pending: (pendingRes.data.data || []).length,
         tenants: approved.filter(u => u.role === 'tenant').length,
-        guards: approved.filter(u => u.role === 'guard').length
+        guards: approved.filter(u => u.role === 'guard').length,
+        inside: visitors.filter(v => v.status === 'Checked-In').length,
+        expired: visitors.filter(v => v.status === 'Expired').length
       });
     } catch (err) { console.error("Stats Error:", err); }
   };
@@ -71,6 +80,10 @@ const AdminDashboard = () => {
   useEffect(() => { 
     if (currentUser) fetchData(); 
   }, [fetchData, currentUser]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, logFilter, searchQuery]);
 
   const handleApprove = async (id) => {
     try {
@@ -116,7 +129,7 @@ const AdminDashboard = () => {
         return;
       }
 
-      const headers = ['Name', 'Phone/Email', 'ID Number', 'Purpose', 'Status', 'Host Unit', 'Host Name', 'Check In', 'Check Out'];
+      const headers = ['Name', 'Phone/Email', 'ID Number', 'Purpose', 'Status', 'Host Unit', 'Host Name', 'Check In', 'Check Out', 'Checked In By', 'Checked Out By'];
       const csvRows = [headers.join(',')];
       
       filtered.forEach(v => {
@@ -129,7 +142,9 @@ const AdminDashboard = () => {
           `"${v.tenantId?.unitNumber || ''}"`,
           `"${v.tenantId?.name || ''}"`,
           `"${v.checkInTime ? new Date(v.checkInTime).toLocaleString() : ''}"`,
-          `"${v.checkOutTime ? new Date(v.checkOutTime).toLocaleString() : ''}"`
+          `"${v.checkOutTime ? new Date(v.checkOutTime).toLocaleString() : ''}"`,
+          `"${v.checkedInBy?.name || ''}"`,
+          `"${v.checkedOutBy?.name || ''}"`
         ];
         csvRows.push(row.join(','));
       });
@@ -148,6 +163,31 @@ const AdminDashboard = () => {
       alert("Failed to generate report.");
     }
   };
+
+  const handleAdminCheckOut = async (id) => {
+    if (!window.confirm("Manual Override: Are you sure you want to force check-out this visitor?")) return;
+    try {
+      await API.put(`/visitors/checkout/${id}`);
+      alert("Visitor checked out via override.");
+      setSelectedLog(null);
+      fetchData();
+    } catch (err) { alert("Check-out failed: " + (err.response?.data?.message || err.message)); }
+  };
+
+  const isOverdue = (v) => v.status === 'Checked-In' && v.checkInTime && (Date.now() - new Date(v.checkInTime).getTime() > 6 * 60 * 60 * 1000);
+
+  const filteredData = activeTab === 'logs'
+    ? data.filter(item => {
+        if (logFilter !== 'all' && item.status !== logFilter) return false;
+        if (searchQuery.trim() !== '') {
+          return item.name?.toLowerCase().includes(searchQuery.toLowerCase());
+        }
+        return true;
+      })
+    : data;
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
+  const currentData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans text-slate-900 text-left">
@@ -175,7 +215,7 @@ const AdminDashboard = () => {
         <div className="p-6 border-t border-slate-800 bg-slate-900/50">
           <div className="flex items-center gap-4 mb-6 px-2">
             <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black shadow-lg">
-              {currentUser?.name?.charAt(0).toUpperCase() || 'A'}
+              {currentUser?.name?.charAt(0)?.toUpperCase() || 'A'}
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-black text-white truncate uppercase">{currentUser?.name || "Administrator"}</p>
@@ -188,78 +228,105 @@ const AdminDashboard = () => {
         </div>
       </aside>
 
-      <main className="flex-1 p-6 md:p-12 h-[100dvh] flex flex-col overflow-hidden w-full">
-        <header className="flex justify-between items-center gap-4 mb-8 md:mb-10 flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-3 text-slate-900 rounded-xl hover:bg-slate-200 transition-all"><Menu size={24} /></button>
-            <div>
-              <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">{activeTab.replace('pending', 'Authorization').replace('tenants', 'Residents').replace('guards', 'Security')}</h2>
-              <p className="text-slate-400 font-black mt-1 uppercase text-[10px] tracking-widest text-left">SecureNest Management Terminal</p>
+      <main className="flex-1 p-4 sm:p-6 md:p-8 h-[100dvh] flex flex-col overflow-hidden w-full">
+        <header className="flex justify-between items-center gap-2 md:gap-4 mb-6 md:mb-8 flex-shrink-0">
+          <div className="flex items-center gap-2 md:gap-4 min-w-0">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-2 text-slate-900 rounded-xl hover:bg-slate-200 transition-all flex-shrink-0"><Menu size={24} /></button>
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none truncate">{activeTab.replace('pending', 'Authorization').replace('tenants', 'Residents').replace('guards', 'Security')}</h2>
+              <p className="hidden sm:block text-slate-400 font-black mt-1 uppercase text-[10px] tracking-widest text-left truncate">SecureNest Management Terminal</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setShowReportModal(true)} className="p-3 md:p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95 flex items-center gap-2" title="Download Report">
-              <Download size={20} />
-              <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest">Report</span>
+          <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+            <button onClick={() => setShowReportModal(true)} className="px-3 py-2 md:p-4 bg-white border border-slate-200 rounded-xl md:rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95 flex items-center gap-1.5 md:gap-2" title="Download Report">
+              <Download size={16} className="md:w-5 md:h-5" />
+              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Report</span>
             </button>
-            <button onClick={fetchData} className="p-3 md:p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95" title="Refresh Data">
+            <button onClick={fetchData} className="hidden md:flex p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95 items-center justify-center" title="Refresh Data">
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
-            <div className="w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-black uppercase shadow-lg">{currentUser?.name?.charAt(0) || 'A'}</div>
+            <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs md:text-sm font-black uppercase shadow-lg flex-shrink-0">{currentUser?.name?.charAt(0) || 'A'}</div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10 text-left flex-shrink-0">
+        {/* Tailwind Safelist: bg-indigo-50 text-indigo-500 bg-red-50 text-red-500 */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8 text-left flex-shrink-0">
           <StatBox icon={<Clock className="text-orange-500"/>} label="Pending" count={stats.pending} color="orange" />
           <StatBox icon={<Building2 className="text-blue-500"/>} label="Residents" count={stats.tenants} color="blue" />
           <StatBox icon={<Users className="text-green-500"/>} label="Security" count={stats.guards} color="green" />
+          <StatBox icon={<CheckCircle2 className="text-indigo-500"/>} label="Currently Inside" count={stats.inside} color="indigo" />
+          <StatBox icon={<ShieldAlert className="text-red-500"/>} label="Expired" count={stats.expired} color="red" />
         </div>
 
         <div className="bg-white rounded-[4xl] md:rounded-[3rem] shadow-sm border border-slate-200 flex flex-col flex-1 min-h-0 relative text-left overflow-hidden">
           {activeTab === 'logs' && !loading && !error && (
-            <div className="px-6 md:px-10 py-4 md:py-6 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center gap-4 bg-slate-50/30 flex-shrink-0">
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic">Filter Logs:</p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setLogFilter('all')}
-                  className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                    logFilter === 'all'
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setLogFilter('Pending')}
-                  className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                    logFilter === 'Pending'
-                      ? 'bg-orange-500 text-white shadow-lg'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Expected
-                </button>
-                <button
-                  onClick={() => setLogFilter('Checked-In')}
-                  className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                    logFilter === 'Checked-In'
-                      ? 'bg-green-500 text-white shadow-lg'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Inside
-                </button>
-                <button
-                  onClick={() => setLogFilter('Checked-Out')}
-                  className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                    logFilter === 'Checked-Out'
-                      ? 'bg-green-600 text-white shadow-lg'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Checked Out
-                </button>
+            <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-50 bg-slate-50/30 flex flex-col text-left flex-shrink-0 gap-4 md:gap-5">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic whitespace-nowrap">Filter Logs:</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setLogFilter('all')}
+                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                      logFilter === 'all'
+                        ? 'bg-blue-600 text-white shadow-lg'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setLogFilter('Pending')}
+                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                      logFilter === 'Pending'
+                        ? 'bg-orange-500 text-white shadow-lg'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Expected
+                  </button>
+                  <button
+                    onClick={() => setLogFilter('Checked-In')}
+                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                      logFilter === 'Checked-In'
+                        ? 'bg-green-500 text-white shadow-lg'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Inside
+                  </button>
+                  <button
+                    onClick={() => setLogFilter('Checked-Out')}
+                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                      logFilter === 'Checked-Out'
+                        ? 'bg-green-600 text-white shadow-lg'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Checked Out
+                  </button>
+                  <button
+                    onClick={() => setLogFilter('Expired')}
+                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                      logFilter === 'Expired'
+                        ? 'bg-red-500 text-white shadow-lg'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Expired
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row w-full gap-2 md:gap-3">
+                <div className="relative w-full sm:max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="SEARCH NAME..." 
+                    className="w-full bg-white border border-slate-200 py-2.5 pl-10 pr-4 rounded-xl text-xs font-bold uppercase tracking-widest outline-none focus:border-blue-600 transition-colors shadow-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -276,38 +343,36 @@ const AdminDashboard = () => {
                <button onClick={fetchData} className="mt-4 bg-slate-900 text-white px-6 md:px-8 py-3 md:py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Retry Sync</button>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 relative">
+            <div className="flex flex-col flex-1 min-h-0">
+             <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 relative">
               <table className="w-full text-left min-w-max md:min-w-full">
                 <thead className="bg-slate-50/90 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-10">
                   <tr>
-                    <th className="px-6 md:px-10 py-4 md:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Identification</th>
-                    <th className="px-6 md:px-10 py-4 md:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status / Role</th>
-                    <th className="px-6 md:px-10 py-4 md:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
+                    <th className="px-6 md:px-8 py-3 md:py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Identification</th>
+                    <th className="px-6 md:px-8 py-3 md:py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status / Role</th>
+                    <th className="px-6 md:px-8 py-3 md:py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {data.length === 0 ? (
+                  {currentData.length === 0 ? (
                     <tr><td colSpan="3" className="py-20 md:py-32 px-6 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">No records found</td></tr>
                   ) : (
-                    (activeTab === 'logs' && logFilter !== 'all'
-                      ? data.filter(item => item.status === logFilter)
-                      : data
-                    ).map((item) => (
+                    currentData.map((item) => (
                       <tr key={item._id} className="hover:bg-blue-50/20 transition-colors group">
-                        <td className="px-6 md:px-10 py-5 md:py-7">
-                          <p className="font-black text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors text-sm md:text-base">{item.name}</p>
-                          <p className="text-[10px] md:text-[11px] text-slate-400 font-bold mt-0.5 italic">{item.email || item.phone}</p>
+                        <td className="px-6 md:px-8 py-4 md:py-5">
+                          <p className="font-black text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors text-sm">{item.name}</p>
+                          <p className="text-[10px] text-slate-400 font-bold mt-0.5 italic">{item.email || item.phone}</p>
                         </td>
-                        <td className="px-6 md:px-10 py-5 md:py-7 text-center">
-                          <span className="bg-blue-50 text-blue-600 border border-blue-100 px-3 md:px-4 py-1 md:py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest italic whitespace-nowrap">
+                        <td className="px-6 md:px-8 py-4 md:py-5 text-center">
+                          <span className={`px-3 md:px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest italic whitespace-nowrap border ${item.status === 'Expired' ? 'bg-red-50 text-red-600 border-red-100' : item.status === 'Checked-In' ? (isOverdue(item) ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100') : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
                             {item.role} {item.unitNumber ? `• Unit ${item.unitNumber}` : ''} {item.status ? `• ${item.status}` : ''}
                           </span>
                         </td>
-                        <td className="px-6 md:px-10 py-5 md:py-7 text-right">
+                        <td className="px-6 md:px-8 py-4 md:py-5 text-right">
                           {activeTab === 'pending' ? (
-                            <button onClick={() => handleApprove(item._id)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg whitespace-nowrap">Approve Access</button>
+                            <button onClick={() => handleApprove(item._id)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg whitespace-nowrap">Approve Access</button>
                           ) : (
-                            <button onClick={() => activeTab === 'logs' ? setSelectedLog(item) : setSelectedUser(item)} className="p-2 md:p-3 bg-slate-50 text-slate-300 hover:text-blue-600 hover:bg-white hover:shadow-md rounded-xl transition-all">
+                            <button onClick={() => activeTab === 'logs' ? setSelectedLog(item) : setSelectedUser(item)} className="p-2 bg-slate-50 text-slate-300 hover:text-blue-600 hover:bg-white hover:shadow-md rounded-xl transition-all">
                               {activeTab === 'logs' ? <Info size={18} /> : <ChevronRight size={18}/>}
                             </button>
                           )}
@@ -317,6 +382,26 @@ const AdminDashboard = () => {
                   )}
                 </tbody>
               </table>
+             </div>
+             {/* Pagination Controls */}
+             <div className="border-t border-slate-100 p-4 bg-slate-50 flex flex-col sm:flex-row items-center justify-between flex-shrink-0 gap-4">
+               <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">
+                 Showing {filteredData.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} entries
+               </span>
+               <div className="flex items-center gap-2">
+                 <button 
+                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                   disabled={currentPage === 1}
+                   className="p-2 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                 ><ChevronLeft size={16} /></button>
+                 <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-600 px-2">Page {currentPage} of {totalPages}</span>
+                 <button 
+                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                   disabled={currentPage === totalPages}
+                   className="p-2 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                 ><ChevronRight size={16} /></button>
+               </div>
+             </div>
             </div>
           )}
         </div>
@@ -352,10 +437,15 @@ const AdminDashboard = () => {
               <DetailField label="Host Tenant" value={`Unit ${selectedLog.tenantId?.unitNumber} (${selectedLog.tenantId?.name})`} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 md:pt-6 border-t border-slate-200/50">
                 <DetailField label="Check-In" value={selectedLog.checkInTime ? new Date(selectedLog.checkInTime).toLocaleString() : 'N/A'} />
+                <DetailField label="Checked In By" value={selectedLog.checkedInBy?.name || 'N/A'} />
                 <DetailField label="Check-Out" value={selectedLog.checkOutTime ? new Date(selectedLog.checkOutTime).toLocaleString() : 'Active'} />
+                <DetailField label="Checked Out By" value={selectedLog.checkedOutBy?.name ? `${selectedLog.checkedOutBy.name}${selectedLog.checkedOutBy.role === 'admin' ? ' (Admin Override)' : ''}` : 'N/A'} />
               </div>
             </div>
-            <button onClick={() => setSelectedLog(null)} className="w-full mt-8 md:mt-10 bg-slate-900 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all shadow-xl">Dismiss Log</button>
+            {selectedLog.status === 'Checked-In' && (
+              <button onClick={() => handleAdminCheckOut(selectedLog._id)} className="w-full mt-6 bg-red-50 text-red-600 py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-100">Manual Override Check-Out</button>
+            )}
+            <button onClick={() => setSelectedLog(null)} className={`w-full ${selectedLog.status === 'Checked-In' ? 'mt-3' : 'mt-8 md:mt-10'} bg-slate-900 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all shadow-xl`}>Dismiss Log</button>
           </div>
         </div>
       )}
@@ -405,9 +495,12 @@ const NavItem = ({ active, onClick, icon, label }) => (
 );
 
 const StatBox = ({ icon, label, count, color }) => (
-  <div className="bg-white p-7 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6">
-    <div className={`p-5 rounded-2xl bg-${color}-50`}>{icon}</div>
-    <div><p className="text-3xl font-black text-slate-900 leading-none">{count}</p><p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2 italic leading-none">{label}</p></div>
+  <div className={`bg-white p-4 md:p-5 rounded-3xl border flex items-center gap-3 md:gap-4 min-w-0 transition-all ${color === 'red' && count > 0 ? 'border-red-300 shadow-lg shadow-red-200 animate-pulse' : 'border-slate-200 shadow-sm'}`}>
+    <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl bg-${color}-50 shrink-0`}>{icon}</div>
+    <div className="min-w-0 flex-1">
+      <p className="text-xl md:text-2xl font-black text-slate-900 leading-none truncate">{count}</p>
+      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 md:mt-1.5 italic leading-tight break-words">{label}</p>
+    </div>
   </div>
 );
 
