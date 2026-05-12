@@ -381,12 +381,22 @@ const AdminDashboard = () => {
                         </div>
                         <div className="min-w-0 truncate">
                           <h4 className="font-black text-slate-800 uppercase tracking-tight text-sm group-hover:text-blue-600 transition-colors truncate">{item.name}</h4>
-                          <p className="text-[10px] text-slate-400 font-bold mt-0.5 italic truncate">{item.email || item.phone}</p>
+                          <p className="text-[10px] text-slate-400 font-bold mt-0.5 italic truncate">
+                            {activeTab === 'logs' ? (
+                              <>
+                                {item.phone || 'No Phone'} • Host: Unit {item.tenantId?.unitNumber || 'N/A'}
+                                {item.checkedInBy && ` • In: ${item.checkedInBy.name}`}
+                                {item.checkedOutBy && ` • Out: ${item.checkedOutBy.name}`}
+                              </>
+                            ) : (
+                              item.email || item.phone
+                            )}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto shrink-0">
                         <span className={`px-3 md:px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest italic whitespace-nowrap border ${item.status === 'Expired' ? 'bg-red-50 text-red-600 border-red-100' : item.status === 'Checked-In' ? (isOverdue(item) ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100') : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                          {item.role} {item.unitNumber ? `• Unit ${item.unitNumber}` : ''} {item.status ? `• ${item.status}` : ''}
+                          {activeTab === 'logs' ? item.status : <>{item.role} {item.unitNumber ? `• Unit ${item.unitNumber}` : ''} {item.status ? `• ${item.status}` : ''}</>}
                         </span>
                         {activeTab === 'pending' ? (
                           <button onClick={() => setConfirmApproveData(item)} disabled={approvingId === item._id} className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg whitespace-nowrap disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center gap-2">
@@ -535,7 +545,7 @@ const AdminDashboard = () => {
               <Trash2 size={32} />
             </div>
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Revoke Access?</h3>
-            <p className="text-xs text-slate-500 mt-2 font-bold max-w-[200px] mx-auto">Are you sure you want to revoke all access for {confirmRevokeData.name}? This action cannot be undone.</p>
+            <p className="text-xs text-slate-500 mt-2 font-bold max-w-50 mx-auto">Are you sure you want to revoke all access for {confirmRevokeData.name}? This action cannot be undone.</p>
             <div className="flex gap-3 mt-8">
               <button 
                 onClick={() => setConfirmRevokeData(null)} 
@@ -565,7 +575,7 @@ const AdminDashboard = () => {
               <ShieldAlert size={32} />
             </div>
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Manual Override?</h3>
-            <p className="text-xs text-slate-500 mt-2 font-bold max-w-[200px] mx-auto">Are you sure you want to force check-out this visitor?</p>
+            <p className="text-xs text-slate-500 mt-2 font-bold max-w-50 mx-auto">Are you sure you want to force check-out this visitor?</p>
             <div className="flex gap-3 mt-8">
               <button 
                 onClick={() => setConfirmCheckoutId(null)} 

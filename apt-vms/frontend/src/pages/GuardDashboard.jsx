@@ -142,6 +142,10 @@ const GuardDashboard = () => {
 
   const filteredList = visitors.filter(v => {
     if (v.status !== activeFilter) return false;
+    if (activeFilter === 'Checked-Out') {
+      const checkerId = v.checkedOutBy?._id || v.checkedOutBy;
+      if (String(checkerId) !== String(user?._id || user?.id)) return false;
+    }
     if (activeFilter === 'Checked-In' && searchQuery.trim() !== '') {
       return v.name?.toLowerCase().includes(searchQuery.toLowerCase());
     }
@@ -222,7 +226,7 @@ const GuardDashboard = () => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-10 text-left">
           <StatBox icon={<Clock className="text-orange-500"/>} label="Expected" count={visitors.filter(v => v.status === 'Pending').length} color="orange" />
           <StatBox icon={<Activity className="text-blue-500"/>} label="Inside" count={visitors.filter(v => v.status === 'Checked-In').length} color="blue" />
-          <StatBox icon={<CheckCircle2 className="text-green-500"/>} label="Cleared Passes" count={visitors.filter(v => v.status === 'Checked-Out').length} color="green" />
+          <StatBox icon={<CheckCircle2 className="text-green-500"/>} label="My Clearances" count={visitors.filter(v => v.status === 'Checked-Out' && String(v.checkedOutBy?._id || v.checkedOutBy) === String(user?._id || user?.id)).length} color="green" />
           <StatBox icon={<ShieldAlert className="text-red-500"/>} label="Expired" count={visitors.filter(v => v.status === 'Expired').length} color="red" />
         </div>
 
@@ -423,13 +427,13 @@ const GuardDashboard = () => {
 
       {/* CONFIRM CHECK-OUT MODAL */}
       {confirmCheckoutId && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-150 flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl">
             <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
               <LogOut size={32} />
             </div>
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Confirm Check-Out?</h3>
-            <p className="text-xs text-slate-500 mt-2 font-bold max-w-[200px] mx-auto">Are you sure you want to clear this visitor for exit?</p>
+            <p className="text-xs text-slate-500 mt-2 font-bold max-w-50 mx-auto">Are you sure you want to clear this visitor for exit?</p>
             <div className="flex gap-3 mt-8">
               <button 
                 onClick={() => setConfirmCheckoutId(null)} 
