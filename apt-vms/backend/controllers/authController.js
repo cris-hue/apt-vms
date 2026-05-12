@@ -1,4 +1,5 @@
 const User = require('../models/User'); 
+const Visitor = require('../models/Visitor');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 
@@ -141,6 +142,43 @@ exports.getTakenUnits = async (req, res) => {
   try {
     const units = await User.distinct('unitNumber', { role: 'tenant', unitNumber: { $ne: null } });
     res.status(200).json({ success: true, units });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get aggregated stats for the admin dashboard
+exports.getStats = async (req, res) => {
+  try {
+    const [userStats, visitorStats] = await Promise.all([
+      User.aggregate([
+        {
+          $group: {
+            _id: null,
+            pending: { $sum: { $cond: [{ $and: [{ $eq: ["$isApproved", false] }, { $ne: ["$role", "admin"] }] }, 1, 0] } },
+            tenants: { $sum: { $cond: [{ $and: [{ $eq: ["$isApproved", true] }, { $eq: ["$role", "tenant"] }] }, 1, 0] } },
+            guards: { $sum: { $cond: [{ $and: [{ $eq: ["$isApproved", true] }, { $eq: ["$role", "guard"] }] }, 1, 0] } }
+          }
+        }
+      ]),
+      Visitor.aggregate([
+        {
+          $group: {
+            _id: null,
+            inside: { $sum: { $cond: [{ $eq: ["$status", "Checked-In"] }, 1, 0] } },
+            expired: { $sum: { $cond: [{ $eq: ["$status", "Expired"] }, 1, 0] } }
+          }
+        }
+      ])
+    ]);
+
+    const uStats = userStats[0] || { pending: 0, tenants: 0, guards: 0 };
+    const vStats = visitorStats[0] || { inside: 0, expired: 0 };
+
+    res.status(200).json({
+      success: true,
+      data: { pending: uStats.pending, tenants: uStats.tenants, guards: uStats.guards, inside: vStats.inside, expired: vStats.expired }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

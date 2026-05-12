@@ -4,16 +4,17 @@ import { AuthContext } from '../context/AuthContext';
 import API from '../api/axios';
 import { 
   Users, AlertCircle, RefreshCw, LogOut, ShieldCheck, ChevronLeft,
-  ClipboardList, UserPlus, Building2, ChevronRight, X, Info, Mail, Trash2, Clock, CheckCircle2, Menu, Download
+  ClipboardList, UserPlus, Building2, ChevronRight, X, Info, Mail, Trash2, Clock, CheckCircle2, Menu, Download, Loader2, User
 } from 'lucide-react';
 import { Search } from 'lucide-react';
 import { ShieldAlert } from 'lucide-react';
 import { io } from 'socket.io-client';
+import { Toaster, toast } from 'react-hot-toast';
 
 const AdminDashboard = () => {
   const { user: currentUser, logout } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('pending'); 
-  const [data, setData] = useState([]);
+  const [appData, setAppData] = useState({ pending: [], approved: [], logs: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({ pending: 0, tenants: 0, guards: 0, inside: 0, expired: 0 });
@@ -29,58 +30,48 @@ const AdminDashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const navigate = useNavigate();
+  const [approvingId, setApprovingId] = useState(null);
+  const [revokingId, setRevokingId] = useState(null);
+  const [checkingOutId, setCheckingOutId] = useState(null);
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false);
+  const [confirmRevokeData, setConfirmRevokeData] = useState(null);
+  const [confirmCheckoutId, setConfirmCheckoutId] = useState(null);
+  const [confirmApproveData, setConfirmApproveData] = useState(null);
 
-  const fetchStats = async () => {
-    try {
-      const [approvedRes, pendingRes, visitorsRes] = await Promise.all([
-        API.get('/auth/approved'),
-        API.get('/auth/pending'),
-        API.get('/visitors/all')
-      ]);
-      const approved = approvedRes.data.data || [];
-      const visitors = visitorsRes.data.data || [];
-      setStats({
-        pending: (pendingRes.data.data || []).length,
-        tenants: approved.filter(u => u.role === 'tenant').length,
-        guards: approved.filter(u => u.role === 'guard').length,
-        inside: visitors.filter(v => v.status === 'Checked-In').length,
-        expired: visitors.filter(v => v.status === 'Expired').length
-      });
-    } catch (err) { console.error("Stats Error:", err); }
-  };
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchAllData = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError(null);
+
     try {
-      let endpoint = '';
-      if (activeTab === 'pending') endpoint = '/auth/pending';
-      else if (activeTab === 'tenants' || activeTab === 'guards') endpoint = '/auth/approved';
-      else if (activeTab === 'logs') endpoint = '/visitors/all';
+      const [pendingRes, approvedRes, logsRes, statsRes] = await Promise.all([
+        API.get('/auth/pending'),
+        API.get('/auth/approved'),
+        API.get('/visitors/all'),
+        API.get('/auth/stats')
+      ]);
 
-      const res = await API.get(endpoint);
-      const result = res.data?.data || [];
+      setAppData({
+        pending: pendingRes.data?.data || [],
+        approved: approvedRes.data?.data || [],
+        logs: logsRes.data?.data || []
+      });
 
-      if (activeTab === 'tenants') {
-        setData(result.filter(u => u.role === 'tenant'));
-      } else if (activeTab === 'guards') {
-        setData(result.filter(u => u.role === 'guard'));
-      } else {
-        setData(result);
-      }
-      
-      fetchStats();
+      setStats(statsRes.data?.data || { pending: 0, tenants: 0, guards: 0, inside: 0, expired: 0 });
     } catch (err) { 
       console.error("Fetch Error:", err);
       setError(err.response?.data?.message || "Server did not respond correctly.");
     } finally { 
-      setLoading(false); 
+      if (showLoading) setLoading(false); 
     }
-  }, [activeTab]);
+  }, []);
+
+  const refreshAllData = useCallback(() => {
+    fetchAllData(true);
+  }, [fetchAllData]);
 
   useEffect(() => { 
-    if (currentUser) fetchData(); 
-  }, [fetchData, currentUser]);
+    if (currentUser) fetchAllData(true); 
+  }, [fetchAllData, currentUser]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -92,40 +83,49 @@ const AdminDashboard = () => {
     const socket = io(socketServer, { transports: ['websocket'] });
 
     socket.on('global-update', () => {
-      fetchData();
+      fetchAllData(false); // Refreshes data in the background without showing a loading spinner!
     });
 
     return () => socket.disconnect();
-  }, [currentUser, fetchData]);
+  }, [currentUser, fetchAllData]);
 
   const handleApprove = async (id) => {
+    setApprovingId(id);
     try {
       const res = await API.put(`/auth/approve/${id}`);
       if (res.data.success) {
-        alert("Access Authorized");
-        fetchData();
+        toast.success("Access Authorized");
+        setConfirmApproveData(null);
+        fetchAllData(false); // Seamlessly update UI after approving
       }
-    } catch (err) { alert("Approval failed"); }
+    } catch (err) { toast.error("Approval failed"); }
+    finally { setApprovingId(null); }
   };
 
-  const handleRevoke = async (id, name) => {
-    if (!window.confirm(`Revoke all access for ${name}?`)) return;
+  const handleRevoke = async (id) => {
+    setRevokingId(id);
     try {
       await API.delete(`/auth/delete/${id}`);
       setSelectedUser(null);
-      fetchData();
-    } catch (err) { alert("Revoke failed"); }
+      setConfirmRevokeData(null);
+      fetchAllData(false); // Seamlessly update UI after revoking
+      toast.success("Access Revoked");
+    } catch (err) { toast.error("Revoke failed"); }
+    finally { setRevokingId(null); }
   };
 
   const handleDownloadReport = async () => {
     if (!reportStartDate || !reportEndDate) {
-      alert("Please select both start and end dates.");
+      toast.error("Please select both start and end dates.");
       return;
     }
-    
+    setIsDownloadingReport(true);
     try {
-      const res = await API.get('/visitors/all');
-      const allVisitors = res.data?.data || [];
+      // Artificial delay to make the loading state visible for fast operations
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Use the pre-fetched logs to generate reports instantly instead of calling the server again!
+      const allVisitors = appData.logs;
       
       const start = new Date(reportStartDate);
       start.setHours(0, 0, 0, 0);
@@ -138,7 +138,7 @@ const AdminDashboard = () => {
       });
 
       if (filtered.length === 0) {
-        alert("No records found in this date range.");
+        toast.error("No records found in this date range.");
         return;
       }
 
@@ -173,37 +173,49 @@ const AdminDashboard = () => {
       setShowReportModal(false);
     } catch (err) {
       console.error("Error generating report", err);
-      alert("Failed to generate report.");
+      toast.error("Failed to generate report.");
+    } finally {
+      setIsDownloadingReport(false);
     }
   };
 
   const handleAdminCheckOut = async (id) => {
-    if (!window.confirm("Manual Override: Are you sure you want to force check-out this visitor?")) return;
+    setCheckingOutId(id);
     try {
       await API.put(`/visitors/checkout/${id}`);
-      alert("Visitor checked out via override.");
+      toast.success("Visitor checked out via override.");
       setSelectedLog(null);
-      fetchData();
-    } catch (err) { alert("Check-out failed: " + (err.response?.data?.message || err.message)); }
+      setConfirmCheckoutId(null);
+      fetchAllData(false); 
+    } catch (err) { toast.error("Check-out failed: " + (err.response?.data?.message || err.message)); }
+    finally { setCheckingOutId(null); }
   };
 
   const isOverdue = (v) => v.status === 'Checked-In' && v.checkInTime && (Date.now() - new Date(v.checkInTime).getTime() > 6 * 60 * 60 * 1000);
 
+  // Derived State: We instantly calculate what to show based on the active tab and the pre-loaded data
+  let activeData = [];
+  if (activeTab === 'pending') activeData = appData.pending;
+  else if (activeTab === 'tenants') activeData = appData.approved.filter(u => u.role === 'tenant');
+  else if (activeTab === 'guards') activeData = appData.approved.filter(u => u.role === 'guard');
+  else if (activeTab === 'logs') activeData = appData.logs;
+
   const filteredData = activeTab === 'logs'
-    ? data.filter(item => {
+    ? activeData.filter(item => {
         if (logFilter !== 'all' && item.status !== logFilter) return false;
         if (searchQuery.trim() !== '') {
           return item.name?.toLowerCase().includes(searchQuery.toLowerCase());
         }
         return true;
       })
-    : data;
+    : activeData;
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
   const currentData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans text-slate-900 text-left">
+      <Toaster position="top-center" reverseOrder={false} />
       
       <aside className={`w-full md:w-80 bg-slate-900 text-slate-300 flex flex-col ${sidebarOpen ? 'fixed inset-0 z-100 md:sticky md:inset-auto md:z-0' : 'hidden md:flex'} md:top-0 md:h-screen shadow-2xl transition-all`}>
         <div className="p-8 flex items-center justify-between gap-3 text-white border-b border-slate-800/50">
@@ -242,12 +254,12 @@ const AdminDashboard = () => {
       </aside>
 
       <main className="flex-1 p-4 sm:p-6 md:p-8 h-dvh flex flex-col overflow-hidden w-full">
-        <header className="flex justify-between items-center gap-2 md:gap-4 mb-6 md:mb-8 shrink-0">
-          <div className="flex items-center gap-2 md:gap-4 min-w-0">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-2 text-slate-900 rounded-xl hover:bg-slate-200 transition-all shrink-0"><Menu size={24} /></button>
-            <div className="min-w-0">
-              <h2 className="text-xl sm:text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none truncate">{activeTab.replace('pending', 'Authorization').replace('tenants', 'Residents').replace('guards', 'Security')}</h2>
-              <p className="hidden sm:block text-slate-400 font-black mt-1 uppercase text-[10px] tracking-widest text-left truncate">SecureNest Management Terminal</p>
+        <header className="flex justify-between items-center gap-4 mb-6 md:mb-8 shrink-0">
+          <div className="flex items-center gap-3 md:gap-4">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-2 text-slate-900 rounded-xl hover:bg-slate-200 transition-colors"><Menu size={24} /></button>
+            <div>
+              <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">{activeTab.replace('pending', 'Authorization').replace('tenants', 'Residents').replace('guards', 'Security').replace('logs', 'System Logs')}</h2>
+              <p className="text-slate-400 font-black mt-1.5 uppercase text-[10px] tracking-widest italic leading-none text-left">SecureNest Management Terminal</p>
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
@@ -255,7 +267,7 @@ const AdminDashboard = () => {
               <Download size={16} className="md:w-5 md:h-5" />
               <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Report</span>
             </button>
-            <button onClick={fetchData} className="hidden md:flex p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95 items-center justify-center" title="Refresh Data">
+            <button onClick={refreshAllData} className="hidden md:flex p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition-all text-slate-600 active:scale-95 items-center justify-center" title="Refresh Data">
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
             <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs md:text-sm font-black uppercase shadow-lg shrink-0">{currentUser?.name?.charAt(0) || 'A'}</div>
@@ -353,7 +365,7 @@ const AdminDashboard = () => {
                <AlertCircle size={40} className="text-red-400" />
                <h4 className="text-lg md:text-xl font-black uppercase text-slate-800 tracking-tight">Access Interrupted</h4>
                <p className="text-slate-400 font-bold text-sm max-w-md">{error}</p>
-               <button onClick={fetchData} className="mt-4 bg-slate-900 text-white px-6 md:px-8 py-3 md:py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Retry Sync</button>
+               <button onClick={refreshAllData} className="mt-4 bg-slate-900 text-white px-6 md:px-8 py-3 md:py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Retry Sync</button>
             </div>
           ) : (
             <div className="flex flex-col flex-1 min-h-0">
@@ -377,10 +389,13 @@ const AdminDashboard = () => {
                           {item.role} {item.unitNumber ? `• Unit ${item.unitNumber}` : ''} {item.status ? `• ${item.status}` : ''}
                         </span>
                         {activeTab === 'pending' ? (
-                          <button onClick={() => handleApprove(item._id)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg whitespace-nowrap">Approve Access</button>
+                          <button onClick={() => setConfirmApproveData(item)} disabled={approvingId === item._id} className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg whitespace-nowrap disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                            {approvingId === item._id ? <Loader2 size={14} className="animate-spin" /> : null}
+                            {approvingId === item._id ? 'Approving...' : 'Approve Access'}
+                          </button>
                         ) : (
                           <button onClick={() => activeTab === 'logs' ? setSelectedLog(item) : setSelectedUser(item)} className="p-2 bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md rounded-xl transition-all">
-                            {activeTab === 'logs' ? <Info size={18} /> : <ChevronRight size={18}/>}
+                            <Info size={18} />
                           </button>
                         )}
                       </div>
@@ -414,43 +429,63 @@ const AdminDashboard = () => {
 
       {/* --- MODALS --- */}
       {selectedUser && (
-        <div className="fixed inset-0 z-120 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-[4xl] md:rounded-[3rem] p-8 md:p-12 relative shadow-2xl text-left animate-in zoom-in-95 duration-200">
-            <button onClick={() => setSelectedUser(null)} className="absolute top-6 md:top-10 right-6 md:right-10 text-slate-300 hover:text-slate-600 transition-colors"><X size={28}/></button>
-            <h3 className="text-2xl md:text-3xl font-black text-slate-900 uppercase tracking-tighter mb-2">{selectedUser.name}</h3>
-            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-6 md:mb-8 italic">Account Management</p>
-            <div className="space-y-4 mb-8 md:mb-10 bg-slate-50 p-6 md:p-8 rounded-[4xl] md:rounded-[2.5rem] border border-slate-100">
-               <DetailField label="Registered Identity" value={selectedUser.email || selectedUser.phone} />
-               <DetailField label="Assigned Role" value={selectedUser.role} />
+        <div className="fixed inset-0 z-120 flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl relative">
+            <button onClick={() => setSelectedUser(null)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-600 transition-colors"><X size={24}/></button>
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100">
+              <User size={32} />
             </div>
-            <button onClick={() => handleRevoke(selectedUser._id, selectedUser.name)} className="w-full bg-red-50 text-red-600 py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm">Revoke System Access</button>
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Account Details</h3>
+            
+            <div className="mt-6 mb-8 text-left bg-slate-50 p-5 rounded-3xl border border-slate-100 space-y-4 shadow-inner">
+              <DetailField label="Full Name" value={selectedUser.name} />
+              <DetailField label="Contact Details" value={selectedUser.email || selectedUser.phone} />
+              <div className="grid grid-cols-2 gap-4">
+                <DetailField label="Assigned Role" value={selectedUser.role} />
+                {selectedUser.role === 'tenant' && selectedUser.unitNumber && (
+                  <DetailField label="Apartment Unit" value={selectedUser.unitNumber} />
+                )}
+              </div>
+            </div>
+
+            <button onClick={() => setConfirmRevokeData({ id: selectedUser._id, name: selectedUser.name })} disabled={revokingId === selectedUser._id} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              {revokingId === selectedUser._id ? <Loader2 size={16} className="animate-spin" /> : null}
+              {revokingId === selectedUser._id ? 'Revoking...' : 'Revoke System Access'}
+            </button>
           </div>
         </div>
       )}
 
       {selectedLog && (
-        <div className="fixed inset-0 z-120 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-[4xl] md:rounded-[3rem] shadow-2xl p-8 md:p-12 text-left animate-in zoom-in-95 duration-200 relative">
-            <button onClick={() => setSelectedLog(null)} className="absolute top-6 md:top-10 right-6 md:right-10 text-slate-300 hover:text-slate-900"><X size={28}/></button>
-            <div className="mb-8 md:mb-10 text-center">
-               <div className="w-16 md:w-20 h-16 md:h-20 bg-blue-600 text-white rounded-3xl flex items-center justify-center text-2xl md:text-3xl font-black mx-auto mb-4 md:mb-6 shadow-xl">{selectedLog.name.charAt(0)}</div>
-               <h3 className="text-2xl md:text-3xl font-black text-slate-900 uppercase tracking-tighter">{selectedLog.name}</h3>
-               <span className="inline-block mt-2 text-[9px] bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-black uppercase tracking-widest">{selectedLog.status} LOG</span>
+        <div className="fixed inset-0 z-120 flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl relative max-h-[90vh] flex flex-col">
+            <button onClick={() => setSelectedLog(null)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-600 transition-colors z-10"><X size={24}/></button>
+            <div className="shrink-0">
+              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100">
+                <ClipboardList size={32} />
+              </div>
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedLog.name}</h3>
+              <span className="inline-block mt-2 text-[9px] bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-black uppercase tracking-widest">{selectedLog.status} LOG</span>
             </div>
-            <div className="space-y-4 md:space-y-6 bg-slate-50 p-6 md:p-8 rounded-[4xl] md:rounded-[2.5rem] border border-slate-100">
+            <div className="mt-6 mb-6 text-left bg-slate-50 p-5 rounded-3xl border border-slate-100 space-y-4 shadow-inner overflow-y-auto min-h-0">
               <DetailField label="Identity Ref" value={selectedLog.idNumber} />
-              <DetailField label="Host Tenant" value={`Unit ${selectedLog.tenantId?.unitNumber} (${selectedLog.tenantId?.name})`} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 md:pt-6 border-t border-slate-200/50">
-                <DetailField label="Check-In" value={selectedLog.checkInTime ? new Date(selectedLog.checkInTime).toLocaleString() : 'N/A'} />
-                <DetailField label="Checked In By" value={selectedLog.checkedInBy?.name || 'N/A'} />
-                <DetailField label="Check-Out" value={selectedLog.checkOutTime ? new Date(selectedLog.checkOutTime).toLocaleString() : 'Active'} />
-                <DetailField label="Checked Out By" value={selectedLog.checkedOutBy?.name ? `${selectedLog.checkedOutBy.name}${selectedLog.checkedOutBy.role === 'admin' ? ' (Admin Override)' : ''}` : 'N/A'} />
+              <DetailField label="Host Tenant" value={`Unit ${selectedLog.tenantId?.unitNumber} (${selectedLog.tenantId?.name || 'Unknown'})`} />
+              <div className="border-t border-slate-200/60 pt-3 mt-3">
+                <DetailField label="Check-In" value={`${selectedLog.checkInTime ? new Date(selectedLog.checkInTime).toLocaleString() : 'N/A'} (by ${selectedLog.checkedInBy?.name || 'N/A'})`} />
+              </div>
+              <div className="border-t border-slate-200/60 pt-3 mt-3">
+                <DetailField label="Check-Out" value={`${selectedLog.checkOutTime ? new Date(selectedLog.checkOutTime).toLocaleString() : 'Active'} (by ${selectedLog.checkedOutBy?.name ? `${selectedLog.checkedOutBy.name}${selectedLog.checkedOutBy.role === 'admin' ? ' - Override' : ''}` : 'N/A'})`} />
               </div>
             </div>
-            {selectedLog.status === 'Checked-In' && (
-              <button onClick={() => handleAdminCheckOut(selectedLog._id)} className="w-full mt-6 bg-red-50 text-red-600 py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-100">Manual Override Check-Out</button>
-            )}
-            <button onClick={() => setSelectedLog(null)} className={`w-full ${selectedLog.status === 'Checked-In' ? 'mt-3' : 'mt-8 md:mt-10'} bg-slate-900 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all shadow-xl`}>Dismiss Log</button>
+            <div className="shrink-0">
+              {selectedLog.status === 'Checked-In' && (
+                <button onClick={() => setConfirmCheckoutId(selectedLog._id)} disabled={checkingOutId === selectedLog._id} className="w-full mb-3 bg-red-50 text-red-600 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {checkingOutId === selectedLog._id ? <Loader2 size={16} className="animate-spin" /> : null}
+                  {checkingOutId === selectedLog._id ? 'Processing...' : 'Manual Override Check-Out'}
+                </button>
+              )}
+              <button onClick={() => setSelectedLog(null)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all shadow-xl">Dismiss Log</button>
+            </div>
           </div>
         </div>
       )}
@@ -484,7 +519,111 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            <button onClick={handleDownloadReport} className="w-full bg-blue-600 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-xl">Generate & Download CSV</button>
+            <button onClick={handleDownloadReport} disabled={isDownloadingReport} className="w-full bg-blue-600 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-xl disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              {isDownloadingReport ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              {isDownloadingReport ? 'Generating...' : 'Generate & Download CSV'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM REVOKE MODAL */}
+      {confirmRevokeData && (
+        <div className="fixed inset-0 z-130 flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+              <Trash2 size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Revoke Access?</h3>
+            <p className="text-xs text-slate-500 mt-2 font-bold max-w-[200px] mx-auto">Are you sure you want to revoke all access for {confirmRevokeData.name}? This action cannot be undone.</p>
+            <div className="flex gap-3 mt-8">
+              <button 
+                onClick={() => setConfirmRevokeData(null)} 
+                disabled={revokingId === confirmRevokeData.id}
+                className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => handleRevoke(confirmRevokeData.id)} 
+                disabled={revokingId === confirmRevokeData.id}
+                className="flex-1 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors shadow-xl shadow-red-200 flex items-center justify-center gap-2 disabled:bg-red-400 disabled:cursor-not-allowed"
+              >
+                {revokingId === confirmRevokeData.id ? <Loader2 size={16} className="animate-spin" /> : null}
+                {revokingId === confirmRevokeData.id ? 'Revoking...' : 'Revoke'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM CHECK-OUT MODAL */}
+      {confirmCheckoutId && (
+        <div className="fixed inset-0 z-130 flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl">
+            <div className="w-16 h-16 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-100">
+              <ShieldAlert size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Manual Override?</h3>
+            <p className="text-xs text-slate-500 mt-2 font-bold max-w-[200px] mx-auto">Are you sure you want to force check-out this visitor?</p>
+            <div className="flex gap-3 mt-8">
+              <button 
+                onClick={() => setConfirmCheckoutId(null)} 
+                disabled={checkingOutId === confirmCheckoutId}
+                className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => handleAdminCheckOut(confirmCheckoutId)} 
+                disabled={checkingOutId === confirmCheckoutId}
+                className="flex-1 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-700 transition-colors shadow-xl shadow-orange-200 flex items-center justify-center gap-2 disabled:bg-orange-400 disabled:cursor-not-allowed"
+              >
+                {checkingOutId === confirmCheckoutId ? <Loader2 size={16} className="animate-spin" /> : null}
+                {checkingOutId === confirmCheckoutId ? 'Processing...' : 'Override'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM APPROVE MODAL */}
+      {confirmApproveData && (
+        <div className="fixed inset-0 z-130 flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100">
+              <ShieldCheck size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Approve Access?</h3>
+            
+            <div className="mt-6 mb-8 text-left bg-slate-50 p-5 rounded-3xl border border-slate-100 space-y-4 shadow-inner">
+              <DetailField label="Full Name" value={confirmApproveData.name} />
+              <DetailField label="Contact Details" value={confirmApproveData.email || confirmApproveData.phone} />
+              <div className="grid grid-cols-2 gap-4">
+                <DetailField label="Requested Role" value={confirmApproveData.role} />
+                {confirmApproveData.role === 'tenant' && confirmApproveData.unitNumber && (
+                  <DetailField label="Apartment Unit" value={confirmApproveData.unitNumber} />
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setConfirmApproveData(null)} 
+                disabled={approvingId === confirmApproveData._id}
+                className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => handleApprove(confirmApproveData._id)} 
+                disabled={approvingId === confirmApproveData._id}
+                className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-colors shadow-xl shadow-blue-200 flex items-center justify-center gap-2 disabled:bg-blue-400 disabled:cursor-not-allowed"
+              >
+                {approvingId === confirmApproveData._id ? <Loader2 size={16} className="animate-spin" /> : null}
+                {approvingId === confirmApproveData._id ? 'Approving...' : 'Approve'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -7,6 +7,7 @@ const Register = () => {
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', unitNumber: '', password: '', confirmPassword: '', role: 'tenant'
   });
+  const [fieldErrors, setFieldErrors] = useState({ email: '', phone: '' });
   const [error, setError] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +33,25 @@ const Register = () => {
   const unitOptions = Array.from({ length: 100 }, (_, i) => `A${(i + 1).toString().padStart(3, '0')}`);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+
+    // Real-time validation
+    if (name === 'email') {
+      if (/[A-Z]/.test(value)) {
+        setFieldErrors(prev => ({ ...prev, email: 'Email cannot contain capital letters.' }));
+      } else {
+        setFieldErrors(prev => ({ ...prev, email: '' }));
+      }
+    } else if (name === 'phone') {
+      if (/[^\d]/.test(value)) {
+        setFieldErrors(prev => ({ ...prev, phone: 'Phone number can only contain digits.' }));
+      } else if (value.length > 0 && value.length !== 10) {
+        setFieldErrors(prev => ({ ...prev, phone: 'Phone number must be exactly 10 digits.' }));
+      } else {
+        setFieldErrors(prev => ({ ...prev, phone: '' }));
+      }
+    }
   };
 
   useEffect(() => {
@@ -51,6 +70,15 @@ const Register = () => {
     e.preventDefault();
     setError('');
 
+    if (fieldErrors.email || fieldErrors.phone) {
+      return setError("Please fix the real-time validation errors.");
+    }
+    if (/[A-Z]/.test(formData.email)) {
+      return setError("Email cannot contain capital letters.");
+    }
+    if (/[^\d]/.test(formData.phone) || formData.phone.length !== 10) {
+      return setError("Phone number must be exactly 10 digits and contain no letters.");
+    }
     if (formData.password !== formData.confirmPassword) {
       return setError("Passwords do not match");
     }
@@ -101,14 +129,20 @@ const Register = () => {
             <input name="name" type="text" placeholder="Full Name" required className="w-full pl-10 pr-4 py-2 bg-slate-50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all" onChange={handleChange} />
           </div>
 
-          <div className="relative">
-            <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
-            <input name="email" type="email" placeholder="Email Address" required className="w-full pl-10 pr-4 py-2 bg-slate-50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all" onChange={handleChange} />
+          <div>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
+              <input name="email" type="email" placeholder="Email Address" required className={`w-full pl-10 pr-4 py-2 bg-slate-50 border rounded-lg outline-none focus:ring-2 transition-all ${fieldErrors.email ? 'border-red-300 focus:ring-red-500' : 'focus:ring-blue-500'}`} onChange={handleChange} />
+            </div>
+            {fieldErrors.email && <p className="text-red-500 text-[10px] font-bold mt-1 ml-1">{fieldErrors.email}</p>}
           </div>
 
-          <div className="relative">
-            <Phone className="absolute left-3 top-3 text-slate-400" size={18} />
-            <input name="phone" type="tel" placeholder="Phone (e.g. 0711...)" required className="w-full pl-10 pr-4 py-2 bg-slate-50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all" onChange={handleChange} />
+          <div>
+            <div className="relative">
+              <Phone className="absolute left-3 top-3 text-slate-400" size={18} />
+              <input name="phone" type="tel" placeholder="Phone (e.g. 0711...)" required className={`w-full pl-10 pr-4 py-2 bg-slate-50 border rounded-lg outline-none focus:ring-2 transition-all ${fieldErrors.phone ? 'border-red-300 focus:ring-red-500' : 'focus:ring-blue-500'}`} onChange={handleChange} />
+            </div>
+            {fieldErrors.phone && <p className="text-red-500 text-[10px] font-bold mt-1 ml-1">{fieldErrors.phone}</p>}
           </div>
           
           <div className="relative">

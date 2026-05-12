@@ -6,11 +6,12 @@ import {
   ShieldCheck, History, User, LogOut, LayoutDashboard, 
   Settings, Activity, Plus, Save, Mail, CheckCircle2, 
   Clock, Trash2, Edit3, X, Eye, Phone, Share2, Menu, Download, Bell, Search,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Loader2
 } from 'lucide-react';
 import { ShieldAlert } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react'; 
 import InviteModal from '../components/InviteModal';
+import { Toaster, toast } from 'react-hot-toast';
 
 const TenantDashboard = () => {
   const { user, logout, setUser } = useContext(AuthContext); // setUser now works!
@@ -29,6 +30,12 @@ const TenantDashboard = () => {
   const [sortOrder, setSortOrder] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [isUpdatingVisitor, setIsUpdatingVisitor] = useState(false);
+  const [revokingId, setRevokingId] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [confirmRevokeId, setConfirmRevokeId] = useState(null);
+  const [editFieldErrors, setEditFieldErrors] = useState({ name: '', phone: '', idNumber: '' });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -79,37 +86,93 @@ const TenantDashboard = () => {
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
+    setIsUpdatingProfile(true);
     try {
       const { data } = await API.put('/auth/update-me', { phone: profileForm.phone });
       // Now that setUser is in Context, this won't crash!
       setUser(data.data);
       localStorage.setItem('user', JSON.stringify(data.data));
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
       setActiveView('dashboard');
     } catch (err) { 
-      alert("Update failed: " + (err.response?.data?.message || err.message)); 
+      toast.error("Update failed: " + (err.response?.data?.message || err.message)); 
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
+
+  const handleEditChange = (name, value) => {
+    setEditingPass(prev => ({ ...prev, [name]: value }));
+
+    // Real-time validation
+    if (name === 'name') {
+      const words = value.trim().split(/\s+/);
+      if (words.length !== 2 || !words.every(w => /^[A-Z]/.test(w))) {
+        setEditFieldErrors(prev => ({ ...prev, name: 'Must provide exactly two names, starting with capitals.' }));
+      } else {
+        setEditFieldErrors(prev => ({ ...prev, name: '' }));
+      }
+    } else if (name === 'phone') {
+      if (/[^\d]/.test(value)) {
+        setEditFieldErrors(prev => ({ ...prev, phone: 'Phone number can only contain digits.' }));
+      } else if (value.length > 0 && value.length !== 10) {
+        setEditFieldErrors(prev => ({ ...prev, phone: 'Phone number must be exactly 10 digits.' }));
+      } else {
+        setEditFieldErrors(prev => ({ ...prev, phone: '' }));
+      }
+    } else if (name === 'idNumber') {
+      if (/[^\d]/.test(value)) {
+        setEditFieldErrors(prev => ({ ...prev, idNumber: 'ID number can only contain digits.' }));
+      } else if (value.length > 0 && (value.length < 6 || value.length > 8)) {
+        setEditFieldErrors(prev => ({ ...prev, idNumber: 'ID number must be between 6 and 8 digits.' }));
+      } else {
+        setEditFieldErrors(prev => ({ ...prev, idNumber: '' }));
+      }
     }
   };
 
   const handleUpdateVisitor = async (e) => {
     e.preventDefault();
+    
+    if (editFieldErrors.name || editFieldErrors.phone || editFieldErrors.idNumber) {
+      return toast.error("Please fix the real-time validation errors.");
+    }
+    const nameWords = editingPass.name.trim().split(/\s+/);
+    if (nameWords.length !== 2 || !nameWords.every(w => /^[A-Z]/.test(w))) {
+      return toast.error("Must provide exactly two names, starting with capitals.");
+    }
+    if (!/^\d{10}$/.test(editingPass.phone)) return toast.error("Phone number must be exactly 10 digits.");
+    if (!/^\d{6,8}$/.test(editingPass.idNumber)) return toast.error("ID number must be between 6 and 8 digits.");
+
+    setIsUpdatingVisitor(true);
+
     try {
       await API.put(`/visitors/${editingPass._id}`, editingPass);
-      alert("Visitor updated!");
+      toast.success("Visitor updated!");
       setEditingPass(null);
       fetchHistory();
-    } catch (err) { alert("Update failed"); }
+    } catch (err) {
+      toast.error("Update failed: " + (err.response?.data?.message || err.message));
+    } finally {
+      setIsUpdatingVisitor(false);
+    }
   };
 
   const handleRevoke = async (id) => {
-    if (!window.confirm("Revoke this pass?")) return;
+    setRevokingId(id);
     try {
       const res = await API.delete(`/visitors/${id}`);
       if (res.data.success) {
         setHistory(prev => prev.filter(v => v._id !== id));
-        alert("Pass Revoked");
+        toast.success("Pass Revoked");
+        fetchHistory();
+        setConfirmRevokeId(null);
       }
-    } catch (err) { alert("Revoke failed"); }
+    } catch (err) {
+      toast.error("Revoke failed: " + (err.response?.data?.message || err.message));
+    } finally {
+      setRevokingId(null);
+    }
   };
 
   const shareToWhatsApp = (v) => {
@@ -122,13 +185,27 @@ Use this link: ${passUrl}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  const downloadQrCode = () => {
-    const canvas = qrCanvasRef.current || document.getElementById('tenant-qr-canvas');
-    if (!canvas) return alert('QR code not ready yet.');
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png');
-    link.download = `${viewingPass?.name || 'visitor'}-securepass.png`;
-    link.click();
+  const copyLink = (v) => {
+    const baseUrl = import.meta.env.VITE_PUBLIC_URL || window.location.origin;
+    const passUrl = `${baseUrl}/visitor/pass/${v.qrCode}`;
+    navigator.clipboard.writeText(passUrl);
+    toast.success("Link copied!");
+  };
+
+  const downloadQrCode = async () => {
+    setIsDownloading(true);
+    try {
+      // Brief artificial delay to show the loading animation
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const canvas = qrCanvasRef.current || document.getElementById('tenant-qr-canvas');
+      if (!canvas) return toast.error('QR code not ready yet.');
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `${viewingPass?.name || 'visitor'}-securepass.png`;
+      link.click();
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const isOverdue = (v) => v.status === 'Checked-In' && v.checkInTime && (Date.now() - new Date(v.checkInTime).getTime() > 6 * 60 * 60 * 1000);
@@ -150,8 +227,20 @@ Use this link: ${passUrl}`;
   const totalPages = Math.ceil(filteredHistory.length / itemsPerPage) || 1;
   const currentHistoryData = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  // Derived state to check if visitor fields or profile fields have actually been changed
+  const originalPass = editingPass ? history.find(v => v._id === editingPass._id) : null;
+  const hasVisitorChanges = editingPass && originalPass ? (
+    editingPass.name !== originalPass.name ||
+    editingPass.idNumber !== originalPass.idNumber ||
+    editingPass.phone !== originalPass.phone ||
+    editingPass.purpose !== originalPass.purpose
+  ) : false;
+  
+  const hasProfileChanges = profileForm.phone !== (user?.phone || '');
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans text-slate-900">
+      <Toaster position="top-center" reverseOrder={false} />
       <aside className={`w-full md:w-80 bg-slate-900 text-slate-300 flex flex-col ${sidebarOpen ? 'fixed inset-0 z-100 md:sticky md:inset-auto md:z-0' : 'hidden md:flex'} md:top-0 md:h-screen shadow-2xl transition-all`}>
         <div className="p-8 flex items-center justify-between gap-3 text-white border-b border-slate-800/50">
           <div className="flex items-center gap-3">
@@ -279,7 +368,10 @@ Use this link: ${passUrl}`;
                       <input type="text" className="w-full bg-slate-50 border border-slate-100 p-5 pl-14 rounded-2xl font-bold text-sm outline-none focus:ring-4 ring-blue-50 focus:bg-white transition-all" value={profileForm.phone} onChange={e => setProfileForm({phone: e.target.value})} />
                     </div>
                   </div>
-                  <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-3 mt-4"><Save size={18} /> Update My Profile</button>
+                <button type="submit" disabled={isUpdatingProfile || !hasProfileChanges} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-3 mt-4 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed">
+                  {isUpdatingProfile ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} 
+                  {isUpdatingProfile ? 'Updating...' : 'Update My Profile'}
+                </button>
                 </form>
               </div>
             </div>
@@ -342,8 +434,10 @@ Use this link: ${passUrl}`;
                   {v.status === 'Pending' ? (
                     <div className="flex items-center gap-3">
                       <button onClick={() => setViewingPass(v)} className="p-3 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-xl transition-all shadow-sm"><Eye size={18}/></button>
-                      <button onClick={() => setEditingPass(v)} className="p-3 bg-slate-50 text-slate-400 hover:text-green-600 rounded-xl transition-all shadow-sm"><Edit3 size={18}/></button>
-                      <button onClick={() => handleRevoke(v._id)} className="p-3 bg-red-50 text-red-500 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
+                      <button onClick={() => { setEditingPass(v); setEditFieldErrors({name: '', phone: '', idNumber: ''}); }} className="p-3 bg-slate-50 text-slate-400 hover:text-green-600 rounded-xl transition-all shadow-sm"><Edit3 size={18}/></button>
+                    <button onClick={() => setConfirmRevokeId(v._id)} disabled={revokingId === v._id} className="p-3 bg-red-50 text-red-500 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+                      {revokingId === v._id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18}/>}
+                    </button>
                     </div>
                   ) : (
                     <span className={`px-3 md:px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest whitespace-nowrap border ${v.status === 'Checked-In' ? (isOverdue(v) ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100') : v.status === 'Expired' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-50 text-slate-300 border-slate-100'}`}>{v.status}</span>
@@ -385,7 +479,11 @@ Use this link: ${passUrl}`;
             <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 flex justify-center mb-8 shadow-inner"><QRCodeCanvas ref={qrCanvasRef} id="tenant-qr-canvas" value={viewingPass.qrCode} size={180} level="H" includeMargin={true} /></div>
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10">Code: {viewingPass.qrCode}</div>
             <div className="grid gap-3">
-              <button onClick={downloadQrCode} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl shadow-slate-100"><Download size={18} /> Download QR</button>
+              <button onClick={downloadQrCode} disabled={isDownloading} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl shadow-slate-100 disabled:opacity-70 disabled:cursor-not-allowed">
+                {isDownloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />} 
+                {isDownloading ? 'Downloading...' : 'Download QR'}
+              </button>
+              <button onClick={() => copyLink(viewingPass)} className="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all border border-slate-200">Copy Link</button>
               <button onClick={() => shareToWhatsApp(viewingPass)} className="w-full bg-green-500 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-green-600 transition-all shadow-xl shadow-green-100"><Share2 size={18} /> WhatsApp Pass</button>
             </div>
           </div>
@@ -399,13 +497,52 @@ Use this link: ${passUrl}`;
             <h3 className="text-3xl font-black uppercase tracking-tighter mb-8 italic">Correct Invite</h3>
             <form onSubmit={handleUpdateVisitor} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
-                <EditInput label="Full Name" value={editingPass.name} onChange={e => setEditingPass({...editingPass, name: e.target.value})} />
-                <EditInput label="ID Number" value={editingPass.idNumber} onChange={e => setEditingPass({...editingPass, idNumber: e.target.value})} />
-                <EditInput label="Phone" value={editingPass.phone} onChange={e => setEditingPass({...editingPass, phone: e.target.value})} />
-                <EditInput label="Purpose" value={editingPass.purpose} onChange={e => setEditingPass({...editingPass, purpose: e.target.value})} />
+                <EditInput label="Full Name" value={editingPass.name} error={editFieldErrors.name} onChange={e => handleEditChange('name', e.target.value)} />
+                <EditInput label="ID Number" value={editingPass.idNumber} error={editFieldErrors.idNumber} onChange={e => handleEditChange('idNumber', e.target.value)} />
+                <EditInput label="Phone" value={editingPass.phone} error={editFieldErrors.phone} onChange={e => handleEditChange('phone', e.target.value)} />
+                <EditInput label="Purpose" value={editingPass.purpose} onChange={e => handleEditChange('purpose', e.target.value)} />
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest mt-6 shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all"><Save size={18} className="inline mr-2" /> Save Corrections</button>
+              <button type="submit" disabled={isUpdatingVisitor || !hasVisitorChanges} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest mt-6 shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                {isUpdatingVisitor ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} 
+                {isUpdatingVisitor ? 'Saving...' : 'Save Corrections'}
+              </button>
             </form>
+            <div className="mt-8 pt-6 border-t border-slate-100">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Quick Share Updated Pass</p>
+              <div className="flex gap-3">
+                <button onClick={() => copyLink(editingPass)} type="button" className="flex-1 bg-slate-100 text-slate-700 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-all border border-slate-200">Copy Link</button>
+                <button onClick={() => shareToWhatsApp(editingPass)} type="button" className="flex-1 bg-green-500 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-md shadow-green-100"><Share2 size={16} /> WhatsApp</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmRevokeId && (
+        <div className="fixed inset-0 z-120 flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+              <Trash2 size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Revoke Pass?</h3>
+            <p className="text-xs text-slate-500 mt-2 font-bold max-w-50 mx-auto">This action cannot be undone. The visitor will be denied entry.</p>
+            <div className="flex gap-3 mt-8">
+              <button 
+                onClick={() => setConfirmRevokeId(null)} 
+                disabled={revokingId === confirmRevokeId}
+                className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => handleRevoke(confirmRevokeId)} 
+                disabled={revokingId === confirmRevokeId}
+                className="flex-1 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors shadow-xl shadow-red-200 flex items-center justify-center gap-2 disabled:bg-red-400 disabled:cursor-not-allowed"
+              >
+                {revokingId === confirmRevokeId ? <Loader2 size={16} className="animate-spin" /> : null}
+                {revokingId === confirmRevokeId ? 'Revoking...' : 'Revoke'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -433,9 +570,10 @@ const ProfileField = ({ label, value, icon, isLocked }) => (
   </div>
 );
 
-const EditInput = ({ label, value, onChange }) => (
+const EditInput = ({ label, value, onChange, error }) => (
   <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
-  <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl font-bold text-sm outline-none focus:ring-2 ring-blue-100 transition-all" value={value} onChange={onChange} /></div>
+  <input className={`w-full bg-slate-50 border p-4 rounded-xl font-bold text-sm outline-none focus:ring-2 transition-all ${error ? 'border-red-300 focus:ring-red-500' : 'border-slate-100 ring-blue-100'}`} value={value} onChange={onChange} />
+  {error && <p className="text-red-500 text-[10px] font-bold mt-1 ml-1 leading-tight">{error}</p>}</div>
 );
 
 const StatBox = ({ icon, label, count, color }) => (

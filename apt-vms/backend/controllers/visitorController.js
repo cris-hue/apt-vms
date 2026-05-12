@@ -39,6 +39,16 @@ const autoExpirePasses = async () => {
 exports.registerVisitor = async (req, res) => {
   try {
     const { name, idNumber, gender, phone, purpose } = req.body;
+    
+    // Reject registration if this ID is already pending or inside the building
+    const existingActiveVisitor = await Visitor.findOne({
+      idNumber,
+      status: { $in: ['Pending', 'Checked-In'] }
+    });
+    if (existingActiveVisitor) {
+      return res.status(400).json({ success: false, message: 'This ID number is currently in use by an active visitor.' });
+    }
+
     const tenantId = new mongoose.Types.ObjectId(req.user._id || req.user.id);
     const qrData = `VMS-${idNumber}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     const qrCodeImage = await QRCode.toDataURL(qrData);
@@ -77,6 +87,18 @@ exports.updateVisitor = async (req, res) => {
 
     if (visitor.status !== 'Pending') {
       return res.status(400).json({ success: false, message: "Pass already used" });
+    }
+
+    // Check ID Uniqueness if idNumber is being changed
+    if (req.body.idNumber && req.body.idNumber !== visitor.idNumber) {
+      const existingActiveVisitor = await Visitor.findOne({
+        _id: { $ne: visitor._id },
+        idNumber: req.body.idNumber,
+        status: { $in: ['Pending', 'Checked-In'] }
+      });
+      if (existingActiveVisitor) {
+        return res.status(400).json({ success: false, message: 'This ID number is currently in use by an active visitor.' });
+      }
     }
 
     visitor = await Visitor.findByIdAndUpdate(req.params.id, req.body, {

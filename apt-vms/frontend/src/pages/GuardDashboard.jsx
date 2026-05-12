@@ -5,10 +5,11 @@ import {
   ShieldCheck, Search, UserCheck, Clock, 
   LogOut, X, Info, History, Activity, QrCode, 
   CheckCircle2, Camera, CameraOff, ShieldAlert, Menu,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Loader2
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode'; 
 import { io } from 'socket.io-client';
+import { Toaster, toast } from 'react-hot-toast';
 
 const GuardDashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -27,6 +28,9 @@ const GuardDashboard = () => {
   const scannerRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [checkingInId, setCheckingInId] = useState(null);
+  const [checkingOutId, setCheckingOutId] = useState(null);
+  const [confirmCheckoutId, setConfirmCheckoutId] = useState(null);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -113,21 +117,27 @@ const GuardDashboard = () => {
   };
 
   const handleCheckIn = async (id) => {
+    setCheckingInId(id);
     try {
       await API.put(`/visitors/checkin/${id}`);
       setScannedVisitor(null);
       setVmsSearch('');
       setShowVerifyModal(false); 
       fetchVisitors();
-    } catch (err) { alert("Check-in failed"); }
+      toast.success("Visitor Checked-In");
+    } catch (err) { toast.error("Check-in failed: " + (err.response?.data?.message || err.message)); }
+    finally { setCheckingInId(null); }
   };
 
   const handleCheckOut = async (id) => {
+    setCheckingOutId(id);
     try {
       await API.put(`/visitors/checkout/${id}`);
       fetchVisitors();
-      alert("Visitor Cleared for Exit");
-    } catch (err) { alert("Check-out failed"); }
+      toast.success("Visitor Cleared for Exit");
+      setConfirmCheckoutId(null);
+    } catch (err) { toast.error("Check-out failed: " + (err.response?.data?.message || err.message)); }
+    finally { setCheckingOutId(null); }
   };
 
   const filteredList = visitors.filter(v => {
@@ -146,6 +156,7 @@ const GuardDashboard = () => {
   return (
     /* RESPONSIVE LAYOUT: Sidebar hidden on mobile, shown on desktop */
     <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans antialiased text-slate-900 text-left">
+      <Toaster position="top-center" reverseOrder={false} />
       
       {/* --- SIDEBAR (Permanent on Desktop, Overlay on Mobile) --- */}
       <aside className={`w-full md:w-80 bg-slate-900 text-slate-300 flex flex-col ${sidebarOpen ? 'fixed inset-0 z-100 md:sticky md:inset-auto md:z-0' : 'hidden md:flex'} md:top-0 md:h-screen shadow-2xl transition-all`}>
@@ -256,7 +267,10 @@ const GuardDashboard = () => {
                   </div>
                   <div className="flex items-center gap-2 md:gap-3">
                     <button onClick={() => setSelectedVisitor(v)} className="p-2 md:p-3 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-xl transition-all shadow-sm"><Info size={18} /></button>
-                    {v.status === 'Checked-In' && (<button onClick={() => handleCheckOut(v._id)} className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white px-4 md:px-6 py-2 md:py-3 rounded-xl text-[10px] font-bold uppercase shadow-sm transition-all whitespace-nowrap">Check-Out</button>)}
+                    {v.status === 'Checked-In' && (<button onClick={() => setConfirmCheckoutId(v._id)} disabled={checkingOutId === v._id} className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white px-4 md:px-6 py-2 md:py-3 rounded-xl text-[10px] font-bold uppercase shadow-sm transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                      {checkingOutId === v._id ? <Loader2 size={14} className="animate-spin" /> : null}
+                      {checkingOutId === v._id ? 'Checking Out...' : 'Check-Out'}
+                    </button>)}
                   </div>
                 </div>
               </div>
@@ -359,7 +373,10 @@ const GuardDashboard = () => {
                                 <DetailField label="Purpose" value={scannedVisitor.purpose} />
                             </div>
                             {scannedVisitor.status === 'Pending' ? (
-                                <button onClick={() => handleCheckIn(scannedVisitor._id)} className="w-full bg-green-600 hover:bg-green-700 text-white py-4 md:py-6 rounded-[4xl] font-bold uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all"><CheckCircle2 size={20}/> Authorize Entry</button>
+                                <button onClick={() => handleCheckIn(scannedVisitor._id)} disabled={checkingInId === scannedVisitor._id} className="w-full bg-green-600 hover:bg-green-700 text-white py-4 md:py-6 rounded-[4xl] font-bold uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all disabled:bg-green-400 disabled:cursor-not-allowed">
+                                    {checkingInId === scannedVisitor._id ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20}/>}
+                                    {checkingInId === scannedVisitor._id ? 'Authorizing...' : 'Authorize Entry'}
+                                </button>
                             ) : scannedVisitor.status === 'Expired' ? (
                                 <div className="p-4 md:p-6 bg-red-50 border border-red-100 rounded-[4xl] text-center">
                                     <p className="text-[10px] font-extrabold text-red-500 uppercase tracking-[0.2em] italic">Pass Expired</p>
@@ -399,6 +416,36 @@ const GuardDashboard = () => {
                 <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic leading-none text-left">Arrival: <span className="text-slate-800 font-bold block mt-1.5 normal-case">{formatDateTime(selectedVisitor.checkInTime)}</span></div>
                 <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic leading-none text-left">Exit: <span className="text-slate-800 font-bold block mt-1.5 normal-case">{formatDateTime(selectedVisitor.checkOutTime)}</span></div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM CHECK-OUT MODAL */}
+      {confirmCheckoutId && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+              <LogOut size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Confirm Check-Out?</h3>
+            <p className="text-xs text-slate-500 mt-2 font-bold max-w-[200px] mx-auto">Are you sure you want to clear this visitor for exit?</p>
+            <div className="flex gap-3 mt-8">
+              <button 
+                onClick={() => setConfirmCheckoutId(null)} 
+                disabled={checkingOutId === confirmCheckoutId}
+                className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => handleCheckOut(confirmCheckoutId)} 
+                disabled={checkingOutId === confirmCheckoutId}
+                className="flex-1 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors shadow-xl shadow-red-200 flex items-center justify-center gap-2 disabled:bg-red-400 disabled:cursor-not-allowed"
+              >
+                {checkingOutId === confirmCheckoutId ? <Loader2 size={16} className="animate-spin" /> : null}
+                {checkingOutId === confirmCheckoutId ? 'Processing...' : 'Check-Out'}
+              </button>
             </div>
           </div>
         </div>

@@ -8,7 +8,8 @@ const {
   approveUser,
   getApprovedUsers,
   deleteUser,
-  updateMe 
+  updateMe,
+  getStats
 } = require('../controllers/authController');
 
 const { protect, authorize } = require('../middleware/authMiddleware');
@@ -29,6 +30,7 @@ router.put('/update-me', protect, updateMe);
 router.get('/pending', protect, authorize('admin'), getPendingUsers);
 router.get('/approved', protect, authorize('admin'), getApprovedUsers);
 router.put('/approve/:id', protect, authorize('admin'), approveUser);
+router.get('/stats', protect, authorize('admin'), getStats);
 router.delete('/delete/:id', protect, authorize('admin'), deleteUser);
 
 module.exports = router;
