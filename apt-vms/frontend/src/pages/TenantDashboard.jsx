@@ -239,8 +239,22 @@ Use this link: ${passUrl}`;
   const hasProfileChanges = profileForm.phone !== (user?.phone || '');
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans text-slate-900">
+    <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans text-slate-900 relative overflow-hidden">
+      {/* Huge Background Building Picture with Gradient Overlay */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 opacity-[0.06]">
+          <img 
+            src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=2070" 
+            alt="Modern Architecture" 
+            className="w-full h-full object-cover grayscale"
+          />
+        </div>
+        {/* Subtle Blue Gradient Overlay to make the background pop */}
+        <div className="absolute inset-0 bg-linear-to-br from-blue-600/15 via-transparent to-indigo-600/5" />
+      </div>
+
       <Toaster position="top-center" reverseOrder={false} />
+
       <aside className={`w-full md:w-80 bg-slate-900 text-slate-300 flex flex-col ${sidebarOpen ? 'fixed inset-0 z-100 md:sticky md:inset-auto md:z-0' : 'hidden md:flex'} md:top-0 md:h-screen shadow-2xl transition-all`}>
         <div className="p-8 flex items-center justify-between gap-3 text-white border-b border-slate-800/50">
           <div className="flex items-center gap-3">
@@ -270,7 +284,7 @@ Use this link: ${passUrl}`;
         </div>
       </aside>
 
-      <main className="flex-1 p-6 md:p-12 h-dvh flex flex-col overflow-hidden w-full">
+      <main className="flex-1 p-6 md:p-12 h-dvh flex flex-col overflow-hidden w-full relative z-10">
         <header className="flex justify-between items-center gap-4 mb-8 md:mb-10 shrink-0">
           <div className="flex items-center gap-3 md:gap-4">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-2 text-slate-900 rounded-lg hover:bg-slate-200 transition-colors"><Menu size={24} /></button>

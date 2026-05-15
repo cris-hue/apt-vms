@@ -159,7 +159,20 @@ const GuardDashboard = () => {
 
   return (
     /* RESPONSIVE LAYOUT: Sidebar hidden on mobile, shown on desktop */
-    <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans antialiased text-slate-900 text-left">
+    <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans antialiased text-slate-900 text-left relative overflow-hidden">
+      {/* Huge Background Building Picture with Gradient Overlay */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 opacity-[0.06]">
+          <img 
+            src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=2070" 
+            alt="Modern Architecture" 
+            className="w-full h-full object-cover grayscale"
+          />
+        </div>
+        {/* Subtle Blue Gradient Overlay to make the background pop */}
+        <div className="absolute inset-0 bg-linear-to-br from-blue-600/15 via-transparent to-indigo-600/5" />
+      </div>
+
       <Toaster position="top-center" reverseOrder={false} />
       
       {/* --- SIDEBAR (Permanent on Desktop, Overlay on Mobile) --- */}
@@ -204,7 +217,7 @@ const GuardDashboard = () => {
       </aside>
 
       {/* --- MAIN CONTENT (Responsive) --- */}
-      <main className="flex-1 min-h-0 p-6 md:p-12 h-dvh overflow-hidden w-full flex flex-col">
+      <main className="flex-1 min-h-0 p-6 md:p-12 h-dvh overflow-hidden w-full flex flex-col relative z-10">
         <header className="flex justify-between items-center mb-8 md:mb-10 text-left gap-4">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden p-3 text-slate-900 rounded-xl hover:bg-slate-100 transition-all">
