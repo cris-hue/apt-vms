@@ -45,6 +45,36 @@ const sendApprovalEmail = async (user) => {
   });
 };
 
+const sendRevocationEmail = async (user) => {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('Revocation email not sent: SMTP config is missing.');
+    return;
+  }
+
+  const roleText = user.role === 'tenant' ? 'tenant' : 'guard';
+  const subject = 'SecureNest access revoked';
+  const text = `Hello ${user.name},\n\nYour SecureNest ${roleText} account access has been revoked by the administrator.\n\nIf you believe this is an error, please contact the management office.\n\nThanks,\nSecureNest Team`;
+  const html = `
+    <div style="font-family:system-ui, sans-serif; color:#1f2937;">
+      <h2 style="color:#dc2626;">SecureNest Access Revoked</h2>
+      <p>Hello ${user.name},</p>
+      <p>Your SecureNest <strong>${roleText}</strong> account access has been revoked by the administrator.</p>
+      <p>You will no longer be able to log in to the system with this account.</p>
+      <p style="margin-top:24px;">If you believe this is an error, please contact the management office.</p>
+      <p style="margin-top:24px; color:#475569;">Thanks,<br/>SecureNest Team</p>
+    </div>
+  `;
+
+  const transporter = createEmailTransporter();
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+    to: user.email,
+    subject,
+    text,
+    html,
+  });
+};
+
 const sendAdminNotificationEmail = async (newUser) => {
   console.log(`\n=> [SYSTEM ALERTS] Checking if Admin Notification Email can be sent...`);
 
@@ -215,12 +245,22 @@ exports.approveUser = async (req, res) => {
 // @desc    Delete/Revoke user
 exports.deleteUser = async (req, res) => {
   try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Send revocation email
+    sendRevocationEmail(user).catch((err) => {
+      console.error('Revocation email failed:', err);
+    });
+
     await User.findByIdAndDelete(req.params.id);
     
     const io = req.app.get('io');
     if (io) io.emit('global-update');
 
-    res.status(200).json({ success: true, message: "User deleted" });
+    res.status(200).json({ success: true, message: "User access revoked and account deleted" });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 

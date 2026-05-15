@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { Building2, ShieldCheck, Users, CheckCircle2, ArrowRight, Shield } from 'lucide-react';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -21,100 +22,136 @@ const LandingPage = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="mx-auto max-w-7xl px-6 py-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">SecureNest</h1>
-          <p className="text-slate-300 mt-1">Apartment Visitor Management System</p>
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans relative overflow-hidden">
+      {/* Huge Background Building Picture */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 opacity-[0.06]">
+          <img 
+            src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=2070" 
+            alt="Modern Architecture" 
+            className="w-full h-full object-cover grayscale"
+          />
+        </div>
+        {/* Subtle Blue Gradient Overlay */}
+        <div className="absolute inset-0 bg-linear-to-br from-blue-600/8 via-transparent to-indigo-600/3" />
+      </div>
+
+      {/* Header */}
+      <header className="mx-auto max-w-7xl px-4 md:px-6 py-6 md:py-10 flex items-center justify-between relative z-10">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          <div className="bg-blue-600 p-1.5 md:p-2 rounded-lg shadow-lg text-white shrink-0">
+            <ShieldCheck size={24} className="md:w-7 md:h-7" />
+          </div>
+          <div className="truncate">
+            <h1 className="text-xl md:text-2xl font-black tracking-tighter uppercase italic leading-none truncate">
+              SecureNest <span className="hidden sm:inline text-blue-600 not-italic lowercase">system</span>
+            </h1>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Management Terminal</p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
           <Link
             to="/login"
-            className="rounded-full border border-slate-600 bg-slate-900/60 px-5 py-2 text-sm font-semibold transition hover:bg-slate-800"
+            className="rounded-xl border border-slate-200 bg-white px-4 md:px-6 py-2 md:py-2.5 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-600 shadow-sm transition hover:shadow-md active:scale-95"
           >
             Login
           </Link>
           <Link
             to="/register"
-            className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+            className="rounded-xl bg-blue-600 px-4 md:px-6 py-2 md:py-2.5 text-[10px] md:text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 active:scale-95"
           >
             Register
           </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-12">
+      <main className="mx-auto max-w-7xl px-4 md:px-6 py-6 md:py-10 relative z-10">
         <section className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div className="space-y-8">
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-800/80 px-4 py-2 text-sm text-slate-200 ring-1 ring-slate-700">
-              <span className="h-2 w-2 rounded-full bg-green-400" /> Live apartment visitor tracking
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 md:px-4 py-1.5 md:py-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-blue-600 italic border border-blue-100">
+              <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" /> Live apartment visitor tracking
             </div>
 
             <div className="space-y-6">
-              <h2 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
-                Welcome to SecureNest
+              <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic leading-[0.9] sm:text-7xl text-slate-900">
+                Your Property <br />
+                <span className="text-blue-600">Securely</span> Managed
               </h2>
-              <p className="max-w-xl text-lg leading-8 text-slate-300">
+              <p className="max-w-xl text-sm font-bold leading-relaxed text-slate-500 uppercase tracking-tight">
                 Manage visitor access, approve guests instantly, and keep your apartment community secure with the modern visitor management tool built for admins, tenants, and guards.
               </p>
             </div>
 
-            <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/register"
-                className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-500"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-8 py-4 text-xs font-black uppercase tracking-widest text-white shadow-xl shadow-slate-200 transition hover:bg-slate-800 active:scale-95"
               >
-                Get Started
+                Get Started <ArrowRight size={16} />
               </Link>
               <Link
                 to="/login"
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-600 bg-slate-900/80 px-6 py-3 text-base font-semibold text-white transition hover:border-slate-500"
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-600 shadow-sm transition hover:shadow-md active:scale-95"
               >
                 Sign In
               </Link>
             </div>
           </div>
 
-          <div className="rounded-4xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl shadow-slate-950/40">
+          <div className="rounded-[2.5rem] md:rounded-[3rem] border border-slate-200 bg-white p-6 md:p-10 shadow-xl shadow-slate-100 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-10 opacity-5 text-slate-900">
+              <Building2 size={200} />
+            </div>
             <div className="space-y-6">
-              <div className="rounded-3xl bg-slate-950/80 p-6 ring-1 ring-slate-800">
-                <p className="text-sm uppercase tracking-[0.24em] text-blue-400">Visitor Portal</p>
-                <h3 className="mt-4 text-3xl font-semibold">Fast approval flow</h3>
-                <p className="mt-3 text-slate-400">
+              <div className="rounded-4xl bg-slate-50 p-8 border border-slate-100">
+                <p className="text-[10px] uppercase tracking-widest font-black text-blue-600 italic">Visitor Portal</p>
+                <h3 className="mt-3 text-2xl font-black uppercase tracking-tighter text-slate-900 italic">Fast approval flow</h3>
+                <p className="mt-3 text-xs font-bold text-slate-500 leading-relaxed uppercase">
                   Approve or reject visitor requests in seconds. Generate secure guest passes and let your guard team verify visitor details instantly.
                 </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-3xl bg-slate-950/80 p-5 ring-1 ring-slate-800">
-                  <p className="text-sm font-semibold text-slate-300">Smart visitor tracking</p>
-                  <p className="mt-2 text-sm text-slate-400">Know who enters and exits your building at a glance.</p>
+                <div className="rounded-4xl bg-white p-6 border border-slate-100 shadow-sm">
+                  <CheckCircle2 className="text-green-500 mb-3" size={24} />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Smart tracking</p>
+                  <p className="mt-2 text-[10px] font-bold text-slate-400 uppercase leading-tight">Know who enters and exits your building at a glance.</p>
                 </div>
-                <div className="rounded-3xl bg-slate-950/80 p-5 ring-1 ring-slate-800">
-                  <p className="text-sm font-semibold text-slate-300">Multi-role access</p>
-                  <p className="mt-2 text-sm text-slate-400">Separate dashboards for admins, tenants, and guards.</p>
+                <div className="rounded-4xl bg-white p-6 border border-slate-100 shadow-sm">
+                  <Shield className="text-blue-500 mb-3" size={24} />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Multi-role</p>
+                  <p className="mt-2 text-[10px] font-bold text-slate-400 uppercase leading-tight">Separate dashboards for admins, tenants, and guards.</p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="mt-16 grid gap-8 lg:grid-cols-3">
-          <div className="rounded-3xl bg-slate-900/80 p-8 ring-1 ring-slate-800">
-            <h3 className="text-xl font-semibold text-white">Admin Control</h3>
-            <p className="mt-3 text-slate-400">
+        <section className="mt-20 grid gap-6 lg:grid-cols-3">
+          <div className="rounded-[2.5rem] bg-white p-8 border border-slate-200 shadow-sm hover:shadow-xl transition-all group">
+            <div className="bg-slate-50 w-12 h-12 rounded-xl flex items-center justify-center text-slate-900 mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <ShieldCheck size={24} />
+            </div>
+            <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 italic">Admin Control</h3>
+            <p className="mt-3 text-xs font-bold text-slate-400 uppercase leading-relaxed">
               Configure community access, review visitor reports, and keep visitor history organized in one place.
             </p>
           </div>
-          <div className="rounded-3xl bg-slate-900/80 p-8 ring-1 ring-slate-800">
-            <h3 className="text-xl font-semibold text-white">Tenant Convenience</h3>
-            <p className="mt-3 text-slate-400">
+          <div className="rounded-[2.5rem] bg-white p-8 border border-slate-200 shadow-sm hover:shadow-xl transition-all group">
+            <div className="bg-slate-50 w-12 h-12 rounded-xl flex items-center justify-center text-slate-900 mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <Building2 size={24} />
+            </div>
+            <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 italic">Tenant Convenience</h3>
+            <p className="mt-3 text-xs font-bold text-slate-400 uppercase leading-relaxed">
               Invite guests, manage visitor requests, and monitor arrival status from your dashboard.
             </p>
           </div>
-          <div className="rounded-3xl bg-slate-900/80 p-8 ring-1 ring-slate-800">
-            <h3 className="text-xl font-semibold text-white">Guard Verification</h3>
-            <p className="mt-3 text-slate-400">
+          <div className="rounded-[2.5rem] bg-white p-8 border border-slate-200 shadow-sm hover:shadow-xl transition-all group">
+            <div className="bg-slate-50 w-12 h-12 rounded-xl flex items-center justify-center text-slate-900 mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <Users size={24} />
+            </div>
+            <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 italic">Guard Verification</h3>
+            <p className="mt-3 text-xs font-bold text-slate-400 uppercase leading-relaxed">
               Validate visitor passes quickly and ensure only authorized guests enter your property.
             </p>
           </div>

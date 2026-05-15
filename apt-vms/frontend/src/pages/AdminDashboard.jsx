@@ -22,6 +22,8 @@ const AdminDashboard = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportStartDate, setReportStartDate] = useState('');
   const [reportEndDate, setReportEndDate] = useState('');
+
+  const today = new Date().toISOString().split('T')[0];
   
   const [selectedLog, setSelectedLog] = useState(null); 
   const [selectedUser, setSelectedUser] = useState(null);
@@ -514,6 +516,7 @@ const AdminDashboard = () => {
                 <input 
                   type="date" 
                   value={reportStartDate}
+                  max={today}
                   onChange={(e) => setReportStartDate(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -523,6 +526,7 @@ const AdminDashboard = () => {
                 <input 
                   type="date" 
                   value={reportEndDate}
+                  max={today}
                   onChange={(e) => setReportEndDate(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
